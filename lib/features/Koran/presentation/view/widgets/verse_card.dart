@@ -7,6 +7,7 @@ import 'package:untitled/features/Koran/presentation/view/widgets/bookmark_sheet
 import 'package:untitled/features/Koran/presentation/manager/cubit/verse_cubit.dart';
 import 'package:untitled/features/Koran/presentation/view/widgets/audio_player_sheet.dart';
 import 'package:untitled/words_dialog.dart';
+import 'package:untitled/features/tafsir/tafsir_sheet.dart';
 import 'package:untitled/core/constants/app_constants.dart';
 
 class VerseCard extends StatelessWidget {
@@ -187,7 +188,7 @@ class VerseCard extends StatelessWidget {
                 _ActionButton(
                   icon: Icons.auto_stories_rounded,
                   color: Colors.orange.shade800,
-                  onTap: () => _showTafsir(context),
+                  onTap: () => showTafsirSheet(context, verse),
                 ),
                 _ActionButton(
                   icon: bookmark != null
@@ -240,101 +241,6 @@ class VerseCard extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-
-  void _showTafsir(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        return Container(
-          padding: const EdgeInsets.all(24),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-          ),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 40,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: 24),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                const Text(
-                  " الآية",
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF00695C),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  verse.text,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    
-                    fontSize: 26,
-                    height: 2.0,
-                    color: Colors.black87,
-                    fontWeight: FontWeight.normal,
-                  ),
-                ),
-                const Text(
-                  "تفسير الآية",
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF00695C),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Container(
-                  constraints: BoxConstraints(
-                    maxHeight: MediaQuery.of(context).size.height * 0.5,
-                  ),
-                  child: SingleChildScrollView(
-                    child: Text(
-                      verse.tafsir ?? "لا يوجد تفسير متاح حالياً",
-                      textAlign: TextAlign.right,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        height: 1.8,
-                        color: Colors.black87,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                ElevatedButton(
-                  onPressed: () => Navigator.pop(context),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF00695C),
-                    foregroundColor: Colors.white,
-                    minimumSize: const Size(double.infinity, 50),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    elevation: 0,
-                  ),
-                  child: const Text("إغلاق",
-                      style:
-                          TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                ),
-                const SizedBox(height: 10),
-              ],
-            ),
-          ),
-        );
-      },
     );
   }
 }

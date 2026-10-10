@@ -46,6 +46,12 @@ class DBHelper {
             PRIMARY KEY (day, verse_id)
           )
         ''');
+        await db.execute('''
+          CREATE TABLE IF NOT EXISTS tafsir_cache (
+            source INTEGER, sura INTEGER, aya INTEGER, text TEXT,
+            PRIMARY KEY (source, sura, aya)
+          )
+        ''');
       },
     );
     return _db!;
