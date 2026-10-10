@@ -15,7 +15,7 @@ class DBHelper {
 
     _db = await openDatabase(
       path,
-      version: 8, // 8: words.meaning/meaning_src (content re-import, user tables kept)
+      version: 9, // bump whenever assets/*.json change (re-imports content, user tables kept)
       onCreate: (db, version) async {
         await _createDb(db);
       },
