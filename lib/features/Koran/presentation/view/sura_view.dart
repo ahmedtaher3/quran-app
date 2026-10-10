@@ -11,6 +11,7 @@ import 'package:untitled/features/stats/stats.dart';
 import 'package:untitled/features/stats/stats_view.dart';
 import 'package:untitled/features/hifz/hifz_view.dart';
 import 'package:untitled/features/quiz/quiz_view.dart';
+import 'package:untitled/features/recite/recite_view.dart';
 import 'package:untitled/features/audio/downloads_view.dart';
 import 'package:untitled/features/Koran/data/data_sources/local/db_helper.dart';
 import 'package:untitled/features/khatma/khatma_view.dart';
@@ -364,6 +365,7 @@ class _QuickActions extends StatelessWidget {
     final items = <(IconData, String, Color, Widget)>[
       (Icons.psychology_rounded, "الحفظ", Colors.indigo, const HifzView()),
       (Icons.quiz_rounded, "اختبار", Colors.purple, const QuizView()),
+      (Icons.mic_rounded, "تسميع", Colors.red.shade400, const ReciteStartView()),
       (Icons.insights_rounded, "إحصائياتي", Colors.orange.shade800,
           const StatsView()),
       (Icons.bookmarks_rounded, "العلامات", Colors.teal, const BookmarksView()),
