@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:untitled/core/app_theme.dart';
 import 'package:untitled/features/Koran/data/data_sources/local/db_helper.dart';
 import 'package:untitled/features/khatma/khatma.dart';
 import 'package:untitled/features/stats/stats.dart';
@@ -36,7 +37,7 @@ class StatsView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF9FBF9),
+      backgroundColor: AppColors.bg,
       appBar: AppBar(
         title: const Text("إحصائياتي",
             style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
@@ -151,7 +152,7 @@ class StatsView extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppColors.surface,
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
@@ -181,7 +182,7 @@ class StatsView extends StatelessWidget {
             style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: Colors.teal.shade900)),
+                color: AppColors.heading)),
       );
 
   Widget _weekChart(List<({DateTime day, int verses})> week) {
@@ -190,7 +191,7 @@ class StatsView extends StatelessWidget {
       height: 170,
       padding: const EdgeInsets.fromLTRB(12, 16, 12, 10),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
@@ -210,7 +211,7 @@ class StatsView extends StatelessWidget {
                     height: 4 + 80 * d.verses / maxV,
                     decoration: BoxDecoration(
                       color: d.verses == 0
-                          ? Colors.teal.shade50
+                          ? AppColors.tealSoft
                           : Colors.teal.shade400,
                       borderRadius: BorderRadius.circular(6),
                     ),
@@ -231,7 +232,7 @@ class StatsView extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: a.earned ? Colors.amber.shade50 : Colors.white,
+        color: a.earned ? AppColors.amberSoft : Colors.white,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
             color: a.earned ? Colors.amber.shade200 : Colors.grey.shade200),

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:untitled/core/app_theme.dart';
 import 'package:untitled/features/Koran/data/data_sources/local/db_helper.dart';
 import 'package:untitled/features/Koran/data/model/sura.dart';
 import 'package:untitled/features/Koran/presentation/view/widgets/sura_view_deatils.dart';
@@ -91,7 +92,7 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF9FBF9),
+      backgroundColor: AppColors.bg,
       appBar: AppBar(
         backgroundColor: _teal,
         iconTheme: const IconThemeData(color: Colors.white),
@@ -251,7 +252,7 @@ class _SearchScreenState extends State<SearchScreen> {
           for (final s in _suraHits)
             ListTile(
               leading: CircleAvatar(
-                backgroundColor: Colors.teal.shade50,
+                backgroundColor: AppColors.tealSoft,
                 child: Text("${s.number}",
                     style: const TextStyle(color: _teal, fontSize: 13)),
               ),
@@ -279,14 +280,14 @@ class _SearchScreenState extends State<SearchScreen> {
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
         child: Text(t,
             style: TextStyle(
-                fontWeight: FontWeight.bold, color: Colors.teal.shade900)),
+                fontWeight: FontWeight.bold, color: AppColors.heading)),
       );
 
   Widget _hitTile(SearchHit h) {
     final a = h.ayah;
     return Card(
       elevation: 0,
-      color: Colors.white,
+      color: AppColors.surface,
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: InkWell(

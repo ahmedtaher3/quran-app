@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:untitled/core/app_theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:untitled/features/Koran/data/data_sources/local/db_helper.dart';
 import 'package:untitled/features/Koran/data/model/ayah.dart';
@@ -80,7 +81,7 @@ class _QuizViewState extends State<QuizView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF9FBF9),
+      backgroundColor: AppColors.bg,
       appBar: AppBar(
         title: const Text("اختبر حفظك",
             style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
@@ -128,13 +129,13 @@ class _QuizViewState extends State<QuizView> {
   Widget _option(IconData icon, String title, String sub, VoidCallback onTap) {
     return Card(
       elevation: 0,
-      color: Colors.white,
+      color: AppColors.surface,
       margin: const EdgeInsets.symmetric(vertical: 6),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         leading: CircleAvatar(
-          backgroundColor: Colors.teal.shade50,
+          backgroundColor: AppColors.tealSoft,
           child: Icon(icon, color: _teal),
         ),
         title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
@@ -211,7 +212,7 @@ class _QuizRoundState extends State<_QuizRound> {
     final q = widget.qs[_i];
     final isText = q.type != QuizType.whichSura;
     return Scaffold(
-      backgroundColor: const Color(0xFFF9FBF9),
+      backgroundColor: AppColors.bg,
       appBar: AppBar(
         backgroundColor: _teal,
         iconTheme: const IconThemeData(color: Colors.white),
@@ -241,7 +242,7 @@ class _QuizRoundState extends State<_QuizRound> {
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: AppColors.surface,
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(color: Colors.teal.shade100, width: 2),
               ),

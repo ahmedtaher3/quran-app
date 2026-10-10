@@ -4,6 +4,7 @@ import 'package:just_audio_background/just_audio_background.dart';
 import 'package:untitled/features/audio/quran_player.dart';
 import 'package:untitled/features/audio/audio_downloads.dart';
 import 'package:untitled/features/daily/daily_ayah.dart';
+import 'package:untitled/core/app_theme.dart';
 import 'loading_screen.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
@@ -14,6 +15,7 @@ void main() async {
     androidNotificationChannelName: 'تلاوة القرآن',
     androidNotificationOngoing: true,
   );
+  await AppSettings.instance.load();
   await QuranPlayer.instance.loadPrefs();
   await AudioDownloads.instance.init();
   QuranPlayer.instance.startLogging();
@@ -25,36 +27,49 @@ void main() async {
 //                 MaterialPageRoute(builder: (_) => const SearchScreen()),
 //               );
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
 
   @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangePlatformBrightness() => AppSettings.instance.platformChanged();
+
+  @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      locale: const Locale('ar'),
-      supportedLocales: const [
-        Locale('en'),
-        Locale('ar'),
-      ],
-      localizationsDelegates: const [
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-      ],
-      title: 'Tarik Al Quran',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF00695C), // Deep Teal/Emerald
-          primary: const Color(0xFF00695C),
-          secondary: const Color(0xFFFFB300), // Amber/Gold
-        ),
-        useMaterial3: true,
-        fontFamily: 'Nabi',
-        scaffoldBackgroundColor:
-            const Color(0xFFF9FBF9), // Soft White/Mint background
-      ),
-      home: LoadingScreen(),
+    return ListenableBuilder(
+      listenable: AppSettings.instance,
+      builder: (context, _) {
+        final settings = AppSettings.instance;
+        return MaterialApp(
+          debugShowCheckedModeBanner: false,
+          locale: const Locale('ar'),
+          supportedLocales: const [Locale('en'), Locale('ar')],
+          localizationsDelegates: const [
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          title: 'Tarik Al Quran',
+          theme: settings.themeData,
+          home: const LoadingScreen(),
+        );
+      },
     );
   }
 }

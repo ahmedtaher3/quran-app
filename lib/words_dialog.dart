@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:untitled/core/app_theme.dart';
 import 'package:untitled/features/audio/quran_player.dart';
 
 import 'features/Koran/data/model/word.dart';
@@ -23,7 +24,7 @@ class WordsDialog extends StatelessWidget {
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Colors.white, Colors.teal.shade50],
+            colors: [Colors.white, AppColors.tealSoft],
           ),
         ),
         child: Column(
@@ -81,7 +82,7 @@ class WordsDialog extends StatelessWidget {
                           builder: (context) => Container(
                             padding: EdgeInsets.all(24),
                             decoration: BoxDecoration(
-                              color: Colors.white,
+                              color: AppColors.surface,
                               borderRadius: BorderRadius.vertical(
                                   top: Radius.circular(32)),
                             ),
@@ -124,7 +125,7 @@ class WordsDialog extends StatelessWidget {
                                 //     style: TextStyle(
                                 //       fontSize: 18,
                                 //       height: 1.6,
-                                //       color: Colors.black87,
+                                //       color: AppColors.text,
                                 //     ),
                                 //   ),
                                 // ),
@@ -205,7 +206,7 @@ class WordsDialog extends StatelessWidget {
                         decoration: BoxDecoration(
                           color: isSpecial
                               ? Colors.orange.shade100
-                              : Colors.teal.shade50,
+                              : AppColors.tealSoft,
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
                             color: isSpecial
@@ -232,7 +233,7 @@ class WordsDialog extends StatelessWidget {
                                 
                                 color: isSpecial
                                     ? Colors.orange.shade900
-                                    : Colors.teal.shade900,
+                                    : AppColors.heading,
                               ),
                             ),
                           ],

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:untitled/core/app_theme.dart';
 import 'package:untitled/features/Koran/data/model/bookmark.dart';
 
 const bookmarkColors = <int>[
@@ -50,8 +51,8 @@ class _BookmarkSheetState extends State<_BookmarkSheet> {
           EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: Container(
         padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
-        decoration: const BoxDecoration(
-          color: Colors.white,
+        decoration: BoxDecoration(
+          color: AppColors.surface,
           borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
         ),
         child: SafeArea(
@@ -116,7 +117,7 @@ class _BookmarkSheetState extends State<_BookmarkSheet> {
                 decoration: InputDecoration(
                   hintText: "ملاحظة (اختياري)",
                   filled: true,
-                  fillColor: Colors.teal.shade50.withOpacity(0.4),
+                  fillColor: AppColors.tealSoft.withOpacity(0.4),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
                     borderSide: BorderSide.none,

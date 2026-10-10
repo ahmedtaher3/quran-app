@@ -83,6 +83,12 @@ flutter:
     - family: Nabi
       fonts:
         - asset: assets/font/Nabi.ttf
+    - family: Hafs
+      fonts:
+        - asset: assets/font/Hafs.ttf
+    - family: Majeed
+      fonts:
+        - asset: assets/font/Majeed.ttf
        
 
 

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:untitled/core/app_theme.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:untitled/features/Koran/data/data_sources/local/db_helper.dart';
 import 'package:untitled/features/Koran/data/repo/quran_repository.dart';
@@ -228,7 +229,7 @@ class _VerseListViewState extends State<VerseListView> {
               }
             },
             child: Scaffold(
-              backgroundColor: const Color(0xFFF9FBF9),
+              backgroundColor: AppColors.bg,
               body: Builder(
                 builder: (innerContext) {
                   String suraTitle = "آيات السورة";

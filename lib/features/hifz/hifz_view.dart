@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:untitled/core/app_theme.dart';
 import 'package:untitled/features/Koran/data/data_sources/local/db_helper.dart';
 import 'package:untitled/features/Koran/data/model/ayah.dart';
 import 'package:untitled/features/Koran/data/model/sura.dart';
@@ -75,7 +76,7 @@ class _HifzViewState extends State<HifzView> {
     final memorized = _bySura.entries.toList()
       ..sort((a, b) => a.key.compareTo(b.key));
     return Scaffold(
-      backgroundColor: const Color(0xFFF9FBF9),
+      backgroundColor: AppColors.bg,
       appBar: AppBar(
         title: const Text("الحفظ والمراجعة",
             style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
@@ -104,7 +105,7 @@ class _HifzViewState extends State<HifzView> {
                       style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: Colors.teal.shade900)),
+                          color: AppColors.heading)),
                   const SizedBox(height: 8),
                   for (final e in memorized) _suraTile(e.key, e.value),
                 ],
@@ -181,7 +182,7 @@ class _HifzViewState extends State<HifzView> {
     final sura = _suras.firstWhere((s) => s.number == number);
     return Card(
       elevation: 0,
-      color: Colors.white,
+      color: AppColors.surface,
       margin: const EdgeInsets.symmetric(vertical: 5),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: ListTile(
@@ -196,7 +197,7 @@ class _HifzViewState extends State<HifzView> {
               child: LinearProgressIndicator(
                 value: info.strength,
                 minHeight: 6,
-                backgroundColor: Colors.teal.shade50,
+                backgroundColor: AppColors.tealSoft,
                 color: Colors.teal,
               ),
             ),
@@ -401,7 +402,7 @@ class _ReviewSessionState extends State<ReviewSession> {
   Widget build(BuildContext context) {
     final verse = _queue[_i].$2;
     return Scaffold(
-      backgroundColor: const Color(0xFFF9FBF9),
+      backgroundColor: AppColors.bg,
       appBar: AppBar(
         backgroundColor: _teal,
         iconTheme: const IconThemeData(color: Colors.white),
@@ -441,7 +442,7 @@ class _ReviewSessionState extends State<ReviewSession> {
                 child: Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: AppColors.surface,
                     borderRadius: BorderRadius.circular(24),
                     border: Border.all(color: Colors.teal.shade100, width: 2),
                   ),

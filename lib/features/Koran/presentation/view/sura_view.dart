@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:untitled/core/app_theme.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:untitled/features/Koran/data/model/sura.dart';
 import 'package:untitled/features/Koran/data/repo/quran_repository.dart';
@@ -13,6 +14,7 @@ import 'package:untitled/features/Koran/data/model/ayah.dart';
 import 'package:untitled/features/stats/stats.dart';
 import 'package:untitled/features/stats/stats_view.dart';
 import 'package:untitled/features/hifz/hifz_view.dart';
+import 'package:untitled/features/settings/settings_view.dart';
 import 'package:untitled/features/prayer/prayer_view.dart';
 import 'package:untitled/features/quiz/quiz_view.dart';
 import 'package:untitled/features/recite/recite_view.dart';
@@ -29,7 +31,7 @@ class SuraView extends StatelessWidget {
       child: Builder(
         builder: (builderContext) {
           return Scaffold(
-            backgroundColor: const Color(0xFFF9FBF9),
+            backgroundColor: AppColors.bg,
             body: CustomScrollView(
               slivers: [
                 SliverAppBar(
@@ -38,6 +40,16 @@ class SuraView extends StatelessWidget {
                   pinned: true,
                   backgroundColor: const Color(0xFF00695C),
                   actions: [
+                    IconButton(
+                      tooltip: "المظهر والخط",
+                      icon: const Icon(Icons.text_format_rounded,
+                          color: Colors.white),
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const SettingsView()),
+                      ),
+                    ),
                     const _StreakAction(),
                     IconButton(
                       tooltip: "العلامات",
@@ -108,7 +120,7 @@ class SuraView extends StatelessWidget {
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 16, vertical: 12),
                               decoration: BoxDecoration(
-                                color: Colors.white,
+                                color: AppColors.surface,
                                 borderRadius: BorderRadius.circular(16),
                                 boxShadow: [
                                   BoxShadow(
@@ -117,7 +129,7 @@ class SuraView extends StatelessWidget {
                                     offset: const Offset(0, 4),
                                   ),
                                 ],
-                                border: Border.all(color: Colors.teal.shade50),
+                                border: Border.all(color: AppColors.tealSoft),
                               ),
                               child: Row(
                                 children: [
@@ -168,7 +180,7 @@ class SuraView extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
-                            color: Colors.teal.shade900,
+                            color: AppColors.heading,
                           ),
                         ),
                       ],
@@ -418,7 +430,7 @@ class _DailyAyahCardState extends State<_DailyAyahCard> {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Material(
-        color: const Color(0xFFFFF8E1),
+        color: AppColors.amberSoft,
         borderRadius: BorderRadius.circular(20),
         child: InkWell(
           borderRadius: BorderRadius.circular(20),
@@ -515,7 +527,7 @@ class _QuickActions extends StatelessWidget {
                 child: Container(
                   width: 84,
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: AppColors.surface,
                     borderRadius: BorderRadius.circular(18),
                     border: Border.all(color: color.withOpacity(0.15)),
                   ),
@@ -609,7 +621,7 @@ class _KhatmaCardState extends State<_KhatmaCard> {
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Material(
-            color: Colors.white,
+            color: AppColors.surface,
             borderRadius: BorderRadius.circular(20),
             child: InkWell(
               borderRadius: BorderRadius.circular(20),
@@ -632,7 +644,7 @@ class _KhatmaCardState extends State<_KhatmaCard> {
                     Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: Colors.amber.shade50,
+                        color: AppColors.amberSoft,
                         shape: BoxShape.circle,
                       ),
                       child: Icon(Icons.track_changes_rounded,
@@ -660,7 +672,7 @@ class _KhatmaCardState extends State<_KhatmaCard> {
                         child: CircularProgressIndicator(
                           value: k.progress,
                           strokeWidth: 4,
-                          backgroundColor: Colors.amber.shade50,
+                          backgroundColor: AppColors.amberSoft,
                           valueColor: AlwaysStoppedAnimation(
                               Colors.amber.shade700),
                         ),
@@ -700,7 +712,7 @@ class SuraItemCard extends StatelessWidget {
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppColors.surface,
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
@@ -732,7 +744,7 @@ class SuraItemCard extends StatelessWidget {
                     Icon(
                       Icons.brightness_7_rounded,
                       size: 50,
-                      color: Colors.teal.shade50.withOpacity(0.5),
+                      color: AppColors.tealSoft.withOpacity(0.5),
                     ),
                     Text(
                       sura.number.toString(),
@@ -752,11 +764,11 @@ class SuraItemCard extends StatelessWidget {
                     children: [
                       Text(
                         sura.name,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                           
-                          color: Colors.black87,
+                          color: AppColors.text,
                         ),
                       ),
                       const SizedBox(height: 4),

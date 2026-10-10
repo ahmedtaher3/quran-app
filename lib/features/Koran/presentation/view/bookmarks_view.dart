@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:untitled/core/app_theme.dart';
 import 'package:untitled/features/Koran/data/data_sources/local/db_helper.dart';
 import 'package:untitled/features/Koran/data/model/bookmark.dart';
 import 'package:untitled/features/Koran/presentation/view/widgets/bookmark_sheet.dart';
@@ -47,7 +48,7 @@ class _BookmarksViewState extends State<BookmarksView> {
         .toList();
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF9FBF9),
+      backgroundColor: AppColors.bg,
       appBar: AppBar(
         title: const Text("العلامات",
             style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
@@ -140,7 +141,7 @@ class _BookmarksViewState extends State<BookmarksView> {
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppColors.surface,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(color: c.withOpacity(0.35), width: 1.5),
           boxShadow: [
@@ -167,7 +168,7 @@ class _BookmarksViewState extends State<BookmarksView> {
                       "${b.suraName ?? ''} • آية ${b.aya}",
                       style: TextStyle(
                           fontWeight: FontWeight.bold,
-                          color: Colors.teal.shade900),
+                          color: AppColors.heading),
                     ),
                   ],
                 ),

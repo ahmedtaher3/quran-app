@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:untitled/core/app_theme.dart';
 import 'package:flutter/services.dart';
 import 'package:untitled/features/Koran/data/model/ayah.dart';
 import 'package:untitled/features/tafsir/tafsir_source.dart';
@@ -55,8 +56,8 @@ class _TafsirSheetState extends State<_TafsirSheet> {
   Widget build(BuildContext context) {
     final v = widget.verse;
     return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
+      decoration: BoxDecoration(
+        color: AppColors.surface,
         borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
       ),
       child: ListView(

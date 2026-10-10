@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:adhan/adhan.dart';
 import 'package:flutter/material.dart';
+import 'package:untitled/core/app_theme.dart';
 import 'package:flutter_compass/flutter_compass.dart';
 import 'package:untitled/core/notifications.dart';
 import 'package:untitled/features/prayer/prayer_service.dart';
@@ -79,7 +80,7 @@ class _PrayerViewState extends State<PrayerView> {
     return DefaultTabController(
       length: 2,
       child: Scaffold(
-        backgroundColor: const Color(0xFFF9FBF9),
+        backgroundColor: AppColors.bg,
         appBar: AppBar(
           title: const Text("مواقيت الصلاة",
               style:
@@ -157,7 +158,7 @@ class _PrayerViewState extends State<PrayerView> {
         const SizedBox(height: 16),
         Card(
           elevation: 0,
-          color: Colors.white,
+          color: AppColors.surface,
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           child: Column(

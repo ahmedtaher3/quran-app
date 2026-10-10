@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:untitled/core/app_theme.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:untitled/features/Koran/data/data_sources/local/db_helper.dart';
 import 'package:untitled/features/Koran/data/model/ayah.dart';
@@ -24,12 +25,7 @@ class VerseCard extends StatelessWidget {
     this.isPlaying = false,
   });
 
-  static final _verseStyle = TextStyle(
-    fontSize: 26,
-    height: 2.0,
-    color: Colors.black.withOpacity(0.85),
-    fontWeight: FontWeight.normal,
-  );
+  TextStyle get _verseStyle => AppSettings.instance.quranStyle();
 
   bool isBasmala(String text) {
     final normalized = text
@@ -74,13 +70,11 @@ class VerseCard extends StatelessWidget {
               Text(
                 verse.text,
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  
-                  fontSize: 32,
-                  height: 1.5,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.teal.shade800,
-                ),
+                style: AppSettings.instance.quranStyle(
+                    scale: 1.2,
+                    color: AppSettings.instance.isDark
+                        ? Colors.teal.shade200
+                        : Colors.teal.shade800),
               ),
               const SizedBox(height: 20),
               Container(
@@ -107,14 +101,18 @@ class VerseCard extends StatelessWidget {
       curve: Curves.easeInOut,
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
-        color: highlight ? const Color(0xFFF1F8E9) : Colors.white,
+        color: highlight
+            ? (AppSettings.instance.isDark
+                ? const Color(0xFF1F3A35)
+                : const Color(0xFFF1F8E9))
+            : AppColors.surface,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
           color: bookmark != null
               ? Color(bookmark!.color)
               : highlight
                   ? Colors.teal.shade200
-                  : Colors.white,
+                  : AppColors.surface,
           width: 2,
         ),
         boxShadow: [
@@ -152,14 +150,14 @@ class VerseCard extends StatelessWidget {
                     Icon(
                       Icons.star_outline_rounded,
                       size: 40,
-                      color: Colors.teal.shade100,
+                      color: AppSettings.instance.isDark ? Colors.teal.shade700 : Colors.teal.shade100,
                     ),
                     Text(
                       verse.ayaNumber?.toString() ?? "",
                       style: TextStyle(
                         
                         fontSize: 14,
-                        color: Colors.teal.shade700,
+                        color: AppColors.heading,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -172,7 +170,7 @@ class VerseCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: Colors.teal.shade50.withOpacity(0.3),
+              color: AppColors.tealSoft.withOpacity(0.5),
               borderRadius: const BorderRadius.vertical(
                 bottom: Radius.circular(24),
               ),

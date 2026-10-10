@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:untitled/core/app_theme.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:untitled/features/Koran/data/model/ayah.dart';
 import 'package:untitled/features/audio/quran_player.dart';
@@ -36,8 +37,8 @@ class _PlayerSheetState extends State<PlayerSheet> {
     return Container(
       constraints:
           BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.9),
-      decoration: const BoxDecoration(
-        color: Colors.white,
+      decoration: BoxDecoration(
+        color: AppColors.surface,
         borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
       ),
       child: SafeArea(
@@ -70,7 +71,7 @@ class _PlayerSheetState extends State<PlayerSheet> {
                         style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
-                            color: Colors.teal.shade900),
+                            color: AppColors.heading),
                       ),
                       const SizedBox(height: 4),
                       Text(qp.reciterName,
@@ -151,7 +152,7 @@ class _PlayerSheetState extends State<PlayerSheet> {
                         style: TextStyle(
                             fontSize: 16, fontWeight: FontWeight.bold)),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.teal.shade50,
+                      backgroundColor: AppColors.tealSoft,
                       foregroundColor: _teal,
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       elevation: 0,
@@ -181,7 +182,7 @@ class _PlayerSheetState extends State<PlayerSheet> {
               value: pos.inMilliseconds.toDouble().clamp(0, max),
               max: max,
               activeColor: _teal,
-              inactiveColor: Colors.teal.shade50,
+              inactiveColor: AppColors.tealSoft,
               onChanged: (v) => p.seek(Duration(milliseconds: v.toInt())),
             ),
             Row(
@@ -277,7 +278,7 @@ class _PlayerSheetState extends State<PlayerSheet> {
           padding: const EdgeInsets.only(bottom: 8),
           child: Text(t,
               style: TextStyle(
-                  fontWeight: FontWeight.bold, color: Colors.teal.shade900)),
+                  fontWeight: FontWeight.bold, color: AppColors.heading)),
         ),
       );
 
@@ -301,7 +302,7 @@ class _PlayerSheetState extends State<PlayerSheet> {
   Widget _round(IconData icon, VoidCallback onTap, {String? tooltip}) {
     return Container(
       decoration:
-          BoxDecoration(color: Colors.teal.shade50, shape: BoxShape.circle),
+          BoxDecoration(color: AppColors.tealSoft, shape: BoxShape.circle),
       child: IconButton(
         tooltip: tooltip,
         icon: Icon(icon, color: _teal, size: 30),

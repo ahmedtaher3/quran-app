@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:untitled/core/app_theme.dart';
 import 'package:untitled/features/Koran/data/data_sources/local/db_helper.dart';
 import 'package:untitled/features/Koran/data/model/sura.dart';
 import 'package:untitled/features/audio/audio_downloads.dart';
@@ -78,7 +79,7 @@ class _DownloadsViewState extends State<DownloadsView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF9FBF9),
+      backgroundColor: AppColors.bg,
       appBar: AppBar(
         title: const Text("التنزيلات",
             style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
@@ -103,7 +104,7 @@ class _DownloadsViewState extends State<DownloadsView> {
                   margin: const EdgeInsets.all(16),
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Colors.teal.shade50,
+                    color: AppColors.tealSoft,
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Row(
@@ -168,7 +169,7 @@ class _DownloadsViewState extends State<DownloadsView> {
     }
     return ListTile(
       leading: CircleAvatar(
-        backgroundColor: Colors.teal.shade50,
+        backgroundColor: AppColors.tealSoft,
         child: Text("${s.number}",
             style: const TextStyle(color: _teal, fontSize: 13)),
       ),

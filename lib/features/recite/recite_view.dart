@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:untitled/core/app_theme.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:untitled/features/Koran/data/data_sources/local/db_helper.dart';
 import 'package:untitled/features/Koran/data/model/ayah.dart';
@@ -15,7 +16,7 @@ class ReciteStartView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF9FBF9),
+      backgroundColor: AppColors.bg,
       appBar: AppBar(
         title: const Text("التسميع بالصوت",
             style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
@@ -42,7 +43,7 @@ class ReciteStartView extends StatelessWidget {
               for (final s in snap.data!)
                 ListTile(
                   leading: CircleAvatar(
-                    backgroundColor: Colors.teal.shade50,
+                    backgroundColor: AppColors.tealSoft,
                     child: Text("${s.number}",
                         style: const TextStyle(color: _teal, fontSize: 13)),
                   ),
@@ -258,7 +259,7 @@ class _ReciteViewState extends State<ReciteView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF9FBF9),
+      backgroundColor: AppColors.bg,
       appBar: AppBar(
         backgroundColor: _teal,
         iconTheme: const IconThemeData(color: Colors.white),
@@ -306,7 +307,7 @@ class _ReciteViewState extends State<ReciteView> {
                       child: Container(
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: AppColors.surface,
                           borderRadius: BorderRadius.circular(24),
                           border: Border.all(
                               color: _listening
@@ -397,7 +398,7 @@ class _ReciteViewState extends State<ReciteView> {
     final color = switch (s) {
       WordState.correct => Colors.green.shade700,
       WordState.missed => Colors.red.shade600,
-      WordState.pending => Colors.black87,
+      WordState.pending => AppColors.text,
     };
     return hidden
         ? Container(
@@ -405,7 +406,7 @@ class _ReciteViewState extends State<ReciteView> {
             height: 28,
             margin: const EdgeInsets.only(top: 10),
             decoration: BoxDecoration(
-              color: Colors.teal.shade50,
+              color: AppColors.tealSoft,
               borderRadius: BorderRadius.circular(8),
             ),
           )
