@@ -9,6 +9,7 @@ import 'package:untitled/features/Koran/presentation/manager/cubit/verse_cubit.d
 import 'package:untitled/features/Koran/presentation/view/widgets/audio_player_sheet.dart';
 import 'package:untitled/words_dialog.dart';
 import 'package:untitled/features/tafsir/tafsir_sheet.dart';
+import 'package:untitled/features/share/share_ayah.dart';
 import 'package:untitled/features/audio/quran_player.dart';
 
 class VerseCard extends StatelessWidget {
@@ -178,6 +179,12 @@ class VerseCard extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
+                _ActionButton(
+                  icon: Icons.ios_share_rounded,
+                  color: Colors.purple.shade400,
+                  onTap: () => showShareAyah(context, verse,
+                      suraName: context.read<VerseCubit>().suraName),
+                ),
                 _ActionButton(
                   icon: Icons.language_rounded,
                   color: Colors.blue.shade700,
