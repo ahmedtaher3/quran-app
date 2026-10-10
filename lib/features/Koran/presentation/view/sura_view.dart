@@ -7,6 +7,9 @@ import 'package:untitled/features/Koran/presentation/manager/sura_cubit/sura_sta
 import 'package:untitled/features/Koran/presentation/view/widgets/sura_view_deatils.dart';
 import 'package:untitled/search_view.dart';
 import 'package:untitled/features/khatma/khatma.dart';
+import 'package:untitled/features/daily/daily_ayah.dart';
+import 'package:untitled/core/notifications.dart';
+import 'package:untitled/features/Koran/data/model/ayah.dart';
 import 'package:untitled/features/stats/stats.dart';
 import 'package:untitled/features/stats/stats_view.dart';
 import 'package:untitled/features/hifz/hifz_view.dart';
@@ -137,6 +140,8 @@ class SuraView extends StatelessWidget {
                         const _KhatmaCard(),
                         const SizedBox(height: 12),
                         const _QuickActions(),
+                        const SizedBox(height: 12),
+                        const _DailyAyahCard(),
                         const SizedBox(height: 4),
                       ],
                     ),
@@ -348,6 +353,127 @@ class _LastReadWidget extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class _DailyAyahCard extends StatefulWidget {
+  const _DailyAyahCard();
+
+  @override
+  State<_DailyAyahCard> createState() => _DailyAyahCardState();
+}
+
+class _DailyAyahCardState extends State<_DailyAyahCard> {
+  Verse? _v;
+  bool _on = false;
+  int _hour = 8;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final v = await ayahOfDay();
+    final (on, hour) = await DailyAyahPrefs.load();
+    if (mounted) {
+      setState(() {
+        _v = v;
+        _on = on;
+        _hour = hour;
+      });
+    }
+  }
+
+  Future<void> _toggleReminder() async {
+    if (_on) {
+      await DailyAyahPrefs.save(false, _hour);
+      setState(() => _on = false);
+      return;
+    }
+    final t = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay(hour: _hour, minute: 0),
+      helpText: "وقت إشعار آية اليوم",
+    );
+    if (t == null) return;
+    await Notifications.requestPermission();
+    await DailyAyahPrefs.save(true, t.hour);
+    if (!mounted) return;
+    setState(() {
+      _on = true;
+      _hour = t.hour;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text("ستصلك آية كل يوم الساعة ${t.format(context)}")));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final v = _v;
+    if (v == null) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Material(
+        color: const Color(0xFFFFF8E1),
+        borderRadius: BorderRadius.circular(20),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => VerseListView(
+                suraNumber: v.sura,
+                SuraName: v.suraName ?? "",
+                ayaNumber: v.ayaNumber,
+              ),
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 8, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.wb_sunny_rounded,
+                        color: Colors.amber.shade800, size: 20),
+                    const SizedBox(width: 8),
+                    Text("آية اليوم",
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.amber.shade900)),
+                    const Spacer(),
+                    IconButton(
+                      tooltip: _on ? "إيقاف الإشعار اليومي" : "إشعار يومي",
+                      icon: Icon(
+                          _on
+                              ? Icons.notifications_active_rounded
+                              : Icons.notifications_none_rounded,
+                          color: Colors.amber.shade800),
+                      onPressed: _toggleReminder,
+                    ),
+                  ],
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(right: 4, left: 8),
+                  child: Text(
+                    v.text,
+                    maxLines: 4,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 20, height: 1.9),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text("${v.suraName ?? ''} • آية ${v.ayaNumber}",
+                    style: TextStyle(color: Colors.grey.shade700, fontSize: 13)),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

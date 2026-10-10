@@ -9,6 +9,7 @@ class Notifications {
   static bool _ready = false;
 
   static const wirdReminderId = 1;
+  static const dailyAyahBaseId = 100; // 100..106, one per upcoming day
 
   static Future<void> init() async {
     if (_ready) return;
@@ -71,6 +72,34 @@ class Notifications {
       ),
       androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
       matchDateTimeComponents: DateTimeComponents.time,
+    );
+  }
+
+  /// One-shot notification at [at] (local time); skipped if in the past.
+  static Future<void> scheduleAt({
+    required int id,
+    required DateTime at,
+    required String title,
+    required String body,
+  }) async {
+    await init();
+    final when = tz.TZDateTime.from(at, tz.local);
+    if (!when.isAfter(tz.TZDateTime.now(tz.local))) return;
+    await _plugin.zonedSchedule(
+      id: id,
+      scheduledDate: when,
+      title: title,
+      body: body,
+      notificationDetails: const NotificationDetails(
+        android: AndroidNotificationDetails(
+          'daily_ayah',
+          'آية اليوم',
+          importance: Importance.defaultImportance,
+          styleInformation: BigTextStyleInformation(''),
+        ),
+        iOS: DarwinNotificationDetails(),
+      ),
+      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
     );
   }
 
