@@ -174,7 +174,7 @@ class DBHelper {
   static Future<List<Map<String, Object?>>> getFlowWords(int sura) async {
     final db = await database;
     return db.rawQuery('''
-      SELECT w.id, w.text, w.audio, w.translation, w.ayaID,
+      SELECT w.id, w.text, w.audio, w.translation, w.code_v3, w.ayaID,
              v.ayaNumber, v.page
       FROM words w JOIN verses v ON v.id = w.ayaID
       WHERE w.sura = ? AND w.char_type = 'word'

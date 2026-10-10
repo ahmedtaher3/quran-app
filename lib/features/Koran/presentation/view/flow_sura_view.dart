@@ -12,7 +12,9 @@ String _ar(int n) => '$n'.split('').map((d) => _arDigits[int.parse(d)]).join();
 
 class FlowWord {
   final int id, ayahId, aya, page;
-  final String text, audio, meaning;
+  final String text, audio, english;
+  final String arabic; // Arabic meaning; often shared by a short phrase
+  bool get hasMeaning => arabic.isNotEmpty;
   FlowWord(Map<String, Object?> r)
       : id = r['id'] as int,
         ayahId = r['ayaID'] as int,
@@ -20,7 +22,8 @@ class FlowWord {
         page = r['page'] as int,
         text = r['text'] as String? ?? '',
         audio = r['audio'] as String? ?? '',
-        meaning = r['translation'] as String? ?? '';
+        english = r['translation'] as String? ?? '',
+        arabic = (r['code_v3'] as String? ?? '').trim();
 }
 
 /// Continuous mushaf-style reading: one justified paragraph per mushaf
@@ -57,6 +60,11 @@ class _FlowSuraViewState extends State<FlowSuraView> {
     if (mounted) setState(() => _pages = pages);
   }
 
+  void _zoom(double d) {
+    final s = AppSettings.instance;
+    s.update(quranSize: (s.quranSize + d).clamp(18, 44).toDouble());
+  }
+
   Future<void> _onWord(FlowWord w) async {
     setState(() => _selected = w.id);
     if (w.audio.isNotEmpty) {
@@ -82,7 +90,19 @@ class _FlowSuraViewState extends State<FlowSuraView> {
         title: Text(widget.suraName,
             style: const TextStyle(color: Colors.white)),
         centerTitle: true,
-        actions: [if (widget.modeToggle != null) widget.modeToggle!],
+        actions: [
+          IconButton(
+            tooltip: "تصغير الخط",
+            icon: const Icon(Icons.text_decrease_rounded, color: Colors.white),
+            onPressed: () => _zoom(-2),
+          ),
+          IconButton(
+            tooltip: "تكبير الخط",
+            icon: const Icon(Icons.text_increase_rounded, color: Colors.white),
+            onPressed: () => _zoom(2),
+          ),
+          if (widget.modeToggle != null) widget.modeToggle!,
+        ],
       ),
       body: pages == null
           ? const Center(child: CircularProgressIndicator())
@@ -146,6 +166,10 @@ class _PageParagraphState extends State<_PageParagraph> {
         color: AppSettings.instance.isDark
             ? Colors.teal.shade200
             : Colors.teal.shade700);
+    final meaningStyle = TextStyle(
+        color: AppSettings.instance.isDark
+            ? const Color(0xFFFFCA6B)
+            : const Color(0xFFB45309));
     final spans = <InlineSpan>[];
     for (var i = 0; i < words.length; i++) {
       final w = words[i];
@@ -158,7 +182,9 @@ class _PageParagraphState extends State<_PageParagraph> {
                 color: _teal,
                 backgroundColor: const Color(0x55FFB300),
               )
-            : null,
+            : w.hasMeaning
+                ? meaningStyle
+                : null,
       ));
       final ayahEnds = i + 1 == words.length || words[i + 1].ayahId != w.ayahId;
       spans.add(ayahEnds
@@ -192,6 +218,34 @@ class _PageParagraphState extends State<_PageParagraph> {
   }
 }
 
+Widget _meaningBox(String label, String text,
+    {required bool rtl, required bool big}) {
+  return Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(14),
+    decoration: BoxDecoration(
+      color: big ? AppColors.amberSoft : AppColors.tealSoft,
+      borderRadius: BorderRadius.circular(16),
+    ),
+    child: Column(
+      children: [
+        Text(label, style: TextStyle(color: AppColors.subtle, fontSize: 13)),
+        const SizedBox(height: 6),
+        Directionality(
+          textDirection: rtl ? TextDirection.rtl : TextDirection.ltr,
+          child: Text(text,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                  fontSize: big ? 20 : 15,
+                  height: 1.6,
+                  color: AppColors.text,
+                  fontFamily: rtl ? null : 'Roboto')),
+        ),
+      ],
+    ),
+  );
+}
+
 class _WordSheet extends StatelessWidget {
   final FlowWord word;
   final String suraName;
@@ -213,32 +267,12 @@ class _WordSheet extends StatelessWidget {
             Text("$suraName • آية ${_ar(word.aya)}",
                 style: TextStyle(color: AppColors.subtle)),
             const SizedBox(height: 16),
-            if (word.meaning.isNotEmpty)
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppColors.tealSoft,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Column(
-                  children: [
-                    Text("المعنى",
-                        style: TextStyle(
-                            color: AppColors.subtle, fontSize: 13)),
-                    const SizedBox(height: 6),
-                    Directionality(
-                      textDirection: TextDirection.ltr,
-                      child: Text(word.meaning,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                              fontSize: 18,
-                              color: AppColors.text,
-                              fontFamily: 'Roboto')),
-                    ),
-                  ],
-                ),
-              ),
+            if (word.hasMeaning)
+              _meaningBox("المعنى", word.arabic, rtl: true, big: true),
+            if (word.english.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              _meaningBox("الترجمة", word.english, rtl: false, big: false),
+            ],
             const SizedBox(height: 12),
             Row(
               children: [
