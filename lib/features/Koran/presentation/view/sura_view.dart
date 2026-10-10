@@ -13,6 +13,7 @@ import 'package:untitled/features/Koran/data/model/ayah.dart';
 import 'package:untitled/features/stats/stats.dart';
 import 'package:untitled/features/stats/stats_view.dart';
 import 'package:untitled/features/hifz/hifz_view.dart';
+import 'package:untitled/features/prayer/prayer_view.dart';
 import 'package:untitled/features/quiz/quiz_view.dart';
 import 'package:untitled/features/recite/recite_view.dart';
 import 'package:untitled/features/audio/downloads_view.dart';
@@ -489,6 +490,7 @@ class _QuickActions extends StatelessWidget {
       if (context.mounted) context.read<SuraCubit>().refreshLastRead();
     });
     final items = <(IconData, String, Color, Widget)>[
+      (Icons.mosque_rounded, "الصلاة", Colors.teal.shade700, const PrayerView()),
       (Icons.psychology_rounded, "الحفظ", Colors.indigo, const HifzView()),
       (Icons.quiz_rounded, "اختبار", Colors.purple, const QuizView()),
       (Icons.mic_rounded, "تسميع", Colors.red.shade400, const ReciteStartView()),

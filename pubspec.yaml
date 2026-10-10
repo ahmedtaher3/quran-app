@@ -49,6 +49,9 @@ dependencies:
   flutter_timezone: ^5.1.1
   just_audio_background: ^0.0.1-beta.17
   speech_to_text: ^7.5.0
+  adhan: ^2.0.0+1
+  geolocator: ^14.1.1
+  flutter_compass: ^0.8.1
 
 dev_dependencies:
   flutter_test:
