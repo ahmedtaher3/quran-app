@@ -38,18 +38,31 @@ int _edit(String a, String b) {
 
 /// Same word, allowing one slip for longer words (speech engines often
 /// drop or swap a letter: الرحمان/الرحمن, يومنون/يؤمنون).
-bool sameWord(String a, String b) =>
-    a == b || (a.length >= 4 && b.length >= 4 && _edit(a, b) <= 1);
+/// [lenient] (children's unclear speech): 2 slips from 5 letters, 1 from 3.
+bool sameWord(String a, String b, {bool lenient = false}) {
+  if (a == b) return true;
+  final n = a.length < b.length ? a.length : b.length;
+  final allowed = lenient
+      ? (n >= 5
+          ? 2
+          : n >= 3
+              ? 1
+              : 0)
+      : (n >= 4 ? 1 : 0);
+  return allowed > 0 && _edit(a, b) <= allowed;
+}
 
 /// Aligns [heard] to [expected] (both normalized tokens) with LCS.
 /// Expected words matched -> correct; unmatched words before the last
 /// matched one -> missed (skipped or wrong); the rest -> pending.
-List<WordState> align(List<String> expected, List<String> heard) {
+List<WordState> align(List<String> expected, List<String> heard,
+    {bool lenient = false}) {
+  bool same(String a, String b) => sameWord(a, b, lenient: lenient);
   final n = expected.length, m = heard.length;
   final dp = List.generate(n + 1, (_) => List.filled(m + 1, 0));
   for (var i = n - 1; i >= 0; i--) {
     for (var j = m - 1; j >= 0; j--) {
-      dp[i][j] = sameWord(expected[i], heard[j])
+      dp[i][j] = same(expected[i], heard[j])
           ? dp[i + 1][j + 1] + 1
           : (dp[i + 1][j] > dp[i][j + 1] ? dp[i + 1][j] : dp[i][j + 1]);
     }
@@ -57,7 +70,7 @@ List<WordState> align(List<String> expected, List<String> heard) {
   final out = List.filled(n, WordState.pending);
   var i = 0, j = 0, lastMatch = -1;
   while (i < n && j < m) {
-    if (sameWord(expected[i], heard[j])) {
+    if (same(expected[i], heard[j])) {
       out[i] = WordState.correct;
       lastMatch = i;
       i++;

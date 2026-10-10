@@ -23,4 +23,14 @@ void main() {
     expect(align(exp, tokens('اه الذين يعني يومنون بالغيب ويقيمون الصلاه')),
         [c, c, c, c, c]);
   });
+
+  test('lenient mode accepts unclear child speech', () {
+    expect(sameWord('الصراط', 'السرات'), isFalse); // 2 slips: strict rejects
+    expect(sameWord('الصراط', 'السرات', lenient: true), isTrue);
+    expect(sameWord('رب', 'رد', lenient: true), isFalse); // short stays exact
+    expect(sameWord('نعبد', 'نعبط', lenient: true), isTrue);
+    final exp = tokens('اهدنا الصراط المستقيم');
+    expect(align(exp, tokens('اهدنا السرات المستكيم'), lenient: true),
+        [WordState.correct, WordState.correct, WordState.correct]);
+  });
 }
