@@ -58,6 +58,12 @@ class DBHelper {
             PRIMARY KEY (recitation, sura)
           )
         ''');
+        await db.execute('''
+          CREATE TABLE IF NOT EXISTS hifz_cards (
+            verse_id INTEGER PRIMARY KEY, sura INTEGER, ease REAL,
+            interval INTEGER, reps INTEGER, due INTEGER
+          )
+        ''');
       },
     );
     return _db!;

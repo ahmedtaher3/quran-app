@@ -9,6 +9,8 @@ import 'package:untitled/search_view.dart';
 import 'package:untitled/features/khatma/khatma.dart';
 import 'package:untitled/features/stats/stats.dart';
 import 'package:untitled/features/stats/stats_view.dart';
+import 'package:untitled/features/hifz/hifz_view.dart';
+import 'package:untitled/features/audio/downloads_view.dart';
 import 'package:untitled/features/Koran/data/data_sources/local/db_helper.dart';
 import 'package:untitled/features/khatma/khatma_view.dart';
 import 'package:untitled/features/Koran/presentation/view/bookmarks_view.dart';
@@ -131,7 +133,9 @@ class SuraView extends StatelessWidget {
                         const _LastReadWidget(),
                         const SizedBox(height: 12),
                         const _KhatmaCard(),
-                        const SizedBox(height: 10),
+                        const SizedBox(height: 12),
+                        const _QuickActions(),
+                        const SizedBox(height: 4),
                       ],
                     ),
                   ),
@@ -342,6 +346,62 @@ class _LastReadWidget extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class _QuickActions extends StatelessWidget {
+  const _QuickActions();
+
+  @override
+  Widget build(BuildContext context) {
+    void go(Widget page) => Navigator.push(
+            context, MaterialPageRoute(builder: (_) => page))
+        .then((_) {
+      if (context.mounted) context.read<SuraCubit>().refreshLastRead();
+    });
+    final items = <(IconData, String, Color, Widget)>[
+      (Icons.psychology_rounded, "الحفظ", Colors.indigo, const HifzView()),
+      (Icons.insights_rounded, "إحصائياتي", Colors.orange.shade800,
+          const StatsView()),
+      (Icons.bookmarks_rounded, "العلامات", Colors.teal, const BookmarksView()),
+      (Icons.download_for_offline_rounded, "التنزيلات", Colors.blueGrey,
+          const DownloadsView()),
+    ];
+    return SizedBox(
+      height: 92,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        children: [
+          for (final (icon, label, color, page) in items)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(18),
+                onTap: () => go(page),
+                child: Container(
+                  width: 84,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: color.withOpacity(0.15)),
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(icon, color: color, size: 28),
+                      const SizedBox(height: 6),
+                      Text(label,
+                          style: const TextStyle(
+                              fontSize: 13, fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
