@@ -170,6 +170,18 @@ class DBHelper {
     return maps.map(Verse.fromJson).toList();
   }
 
+  /// Words of a sura in reading order, with their ayah's page/number.
+  static Future<List<Map<String, Object?>>> getFlowWords(int sura) async {
+    final db = await database;
+    return db.rawQuery('''
+      SELECT w.id, w.text, w.audio, w.translation, w.ayaID,
+             v.ayaNumber, v.page
+      FROM words w JOIN verses v ON v.id = w.ayaID
+      WHERE w.sura = ? AND w.char_type = 'word'
+      ORDER BY w.id
+    ''', [sura]);
+  }
+
   static Future<Verse?> getVerseById(int id) async {
     final db = await database;
     final maps = await db.rawQuery('''

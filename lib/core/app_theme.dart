@@ -26,6 +26,7 @@ class AppSettings extends ChangeNotifier {
   ThemeChoice theme = ThemeChoice.system;
   String quranFont = 'Hafs';
   double quranSize = 26;
+  bool flowReading = false; // mushaf-style continuous text vs ayah cards
 
   static const fonts = {'Hafs': 'حفص', 'Majeed': 'المجيد', 'Nabi': 'نبي'};
 
@@ -34,10 +35,15 @@ class AppSettings extends ChangeNotifier {
     theme = ThemeChoice.values.byName(p.getString('theme') ?? 'system');
     quranFont = p.getString('quran_font') ?? 'Hafs';
     quranSize = p.getDouble('quran_size') ?? 26;
+    flowReading = p.getBool('flow_reading') ?? false;
   }
 
   Future<void> update(
-      {ThemeChoice? theme, String? quranFont, double? quranSize}) async {
+      {ThemeChoice? theme,
+      String? quranFont,
+      double? quranSize,
+      bool? flowReading}) async {
+    this.flowReading = flowReading ?? this.flowReading;
     this.theme = theme ?? this.theme;
     this.quranFont = quranFont ?? this.quranFont;
     this.quranSize = quranSize ?? this.quranSize;
@@ -47,6 +53,7 @@ class AppSettings extends ChangeNotifier {
     await p.setString('theme', this.theme.name);
     await p.setString('quran_font', this.quranFont);
     await p.setDouble('quran_size', this.quranSize);
+    await p.setBool('flow_reading', this.flowReading);
   }
 
   /// Called when the OS switches light/dark while on "system".

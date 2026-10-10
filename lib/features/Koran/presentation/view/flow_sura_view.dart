@@ -1,0 +1,274 @@
+import 'package:flutter/gestures.dart';
+import 'package:flutter/material.dart';
+import 'package:untitled/core/app_theme.dart';
+import 'package:untitled/core/constants/app_constants.dart';
+import 'package:untitled/features/Koran/data/data_sources/local/db_helper.dart';
+import 'package:untitled/features/audio/quran_player.dart';
+import 'package:untitled/features/tafsir/tafsir_sheet.dart';
+
+const _teal = Color(0xFF00695C);
+const _arDigits = '٠١٢٣٤٥٦٧٨٩';
+String _ar(int n) => '$n'.split('').map((d) => _arDigits[int.parse(d)]).join();
+
+class FlowWord {
+  final int id, ayahId, aya, page;
+  final String text, audio, meaning;
+  FlowWord(Map<String, Object?> r)
+      : id = r['id'] as int,
+        ayahId = r['ayaID'] as int,
+        aya = r['ayaNumber'] as int,
+        page = r['page'] as int,
+        text = r['text'] as String? ?? '',
+        audio = r['audio'] as String? ?? '',
+        meaning = r['translation'] as String? ?? '';
+}
+
+/// Continuous mushaf-style reading: one justified paragraph per mushaf
+/// page, so lines reflow to the screen width. Tap a word to hear it and
+/// see its meaning.
+class FlowSuraView extends StatefulWidget {
+  final int sura;
+  final String suraName;
+  final Widget? modeToggle;
+  const FlowSuraView(
+      {super.key, required this.sura, required this.suraName, this.modeToggle});
+
+  @override
+  State<FlowSuraView> createState() => _FlowSuraViewState();
+}
+
+class _FlowSuraViewState extends State<FlowSuraView> {
+  List<List<FlowWord>>? _pages;
+  int? _selected;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final words = (await DBHelper.getFlowWords(widget.sura)).map(FlowWord.new);
+    final pages = <List<FlowWord>>[];
+    for (final w in words) {
+      if (pages.isEmpty || pages.last.first.page != w.page) pages.add([]);
+      pages.last.add(w);
+    }
+    if (mounted) setState(() => _pages = pages);
+  }
+
+  Future<void> _onWord(FlowWord w) async {
+    setState(() => _selected = w.id);
+    if (w.audio.isNotEmpty) {
+      QuranPlayer.instance
+          .playClip('${AppConstants.wordAudioBaseUrl}${w.audio}', title: w.text);
+    }
+    await showModalBottomSheet(
+      context: context,
+      builder: (_) =>
+          _WordSheet(word: w, suraName: widget.suraName, parent: context),
+    );
+    if (mounted) setState(() => _selected = null);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final pages = _pages;
+    final hasBasmala = widget.sura != 1 && widget.sura != 9;
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: _teal,
+        iconTheme: const IconThemeData(color: Colors.white),
+        title: Text(widget.suraName,
+            style: const TextStyle(color: Colors.white)),
+        centerTitle: true,
+        actions: [if (widget.modeToggle != null) widget.modeToggle!],
+      ),
+      body: pages == null
+          ? const Center(child: CircularProgressIndicator())
+          : ListView.builder(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 40),
+              itemCount: pages.length + (hasBasmala ? 1 : 0),
+              itemBuilder: (context, i) {
+                if (hasBasmala && i == 0) {
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Text(
+                      'بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ',
+                      textAlign: TextAlign.center,
+                      style: AppSettings.instance
+                          .quranStyle(scale: 1.05, color: AppColors.heading),
+                    ),
+                  );
+                }
+                final page = pages[i - (hasBasmala ? 1 : 0)];
+                return _PageParagraph(
+                  words: page,
+                  selected: _selected,
+                  onWord: _onWord,
+                );
+              },
+            ),
+    );
+  }
+}
+
+class _PageParagraph extends StatefulWidget {
+  final List<FlowWord> words;
+  final int? selected;
+  final void Function(FlowWord) onWord;
+  const _PageParagraph(
+      {required this.words, required this.selected, required this.onWord});
+
+  @override
+  State<_PageParagraph> createState() => _PageParagraphState();
+}
+
+class _PageParagraphState extends State<_PageParagraph> {
+  // one recognizer per word, owned here so they're disposed with the page
+  late final _taps = [
+    for (final w in widget.words)
+      TapGestureRecognizer()..onTap = () => widget.onWord(w)
+  ];
+
+  @override
+  void dispose() {
+    for (final t in _taps) {
+      t.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final words = widget.words;
+    final marker = TextStyle(
+        color: AppSettings.instance.isDark
+            ? Colors.teal.shade200
+            : Colors.teal.shade700);
+    final spans = <InlineSpan>[];
+    for (var i = 0; i < words.length; i++) {
+      final w = words[i];
+      final sel = w.id == widget.selected;
+      spans.add(TextSpan(
+        text: w.text,
+        recognizer: _taps[i],
+        style: sel
+            ? TextStyle(
+                color: _teal,
+                backgroundColor: const Color(0x55FFB300),
+              )
+            : null,
+      ));
+      final ayahEnds = i + 1 == words.length || words[i + 1].ayahId != w.ayahId;
+      spans.add(ayahEnds
+          ? TextSpan(text: ' ﴿${_ar(w.aya)}﴾ ', style: marker)
+          : const TextSpan(text: ' '));
+    }
+    return Column(
+      children: [
+        Text.rich(
+          TextSpan(children: spans),
+          textAlign: TextAlign.justify,
+          textDirection: TextDirection.rtl,
+          style: AppSettings.instance.quranStyle(),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          child: Row(
+            children: [
+              Expanded(child: Divider(color: Colors.teal.shade100)),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Text(_ar(words.first.page),
+                    style: TextStyle(color: AppColors.subtle, fontSize: 13)),
+              ),
+              Expanded(child: Divider(color: Colors.teal.shade100)),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _WordSheet extends StatelessWidget {
+  final FlowWord word;
+  final String suraName;
+  final BuildContext parent; // the sheet's own context dies on pop
+  const _WordSheet(
+      {required this.word, required this.suraName, required this.parent});
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(word.text,
+                style: AppSettings.instance
+                    .quranStyle(scale: 1.4, color: AppColors.heading)),
+            Text("$suraName • آية ${_ar(word.aya)}",
+                style: TextStyle(color: AppColors.subtle)),
+            const SizedBox(height: 16),
+            if (word.meaning.isNotEmpty)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.tealSoft,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Column(
+                  children: [
+                    Text("المعنى",
+                        style: TextStyle(
+                            color: AppColors.subtle, fontSize: 13)),
+                    const SizedBox(height: 6),
+                    Directionality(
+                      textDirection: TextDirection.ltr,
+                      child: Text(word.meaning,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                              fontSize: 18,
+                              color: AppColors.text,
+                              fontFamily: 'Roboto')),
+                    ),
+                  ],
+                ),
+              ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => QuranPlayer.instance.playClip(
+                        '${AppConstants.wordAudioBaseUrl}${word.audio}',
+                        title: word.text),
+                    icon: const Icon(Icons.volume_up_rounded),
+                    label: const Text("إعادة النطق"),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () async {
+                      final v = await DBHelper.getVerseById(word.ayahId);
+                      if (v == null || !context.mounted) return;
+                      Navigator.pop(context);
+                      if (parent.mounted) showTafsirSheet(parent, v);
+                    },
+                    icon: const Icon(Icons.auto_stories_rounded),
+                    label: const Text("تفسير الآية"),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

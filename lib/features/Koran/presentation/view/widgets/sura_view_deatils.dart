@@ -10,6 +10,8 @@ import 'package:untitled/features/Koran/presentation/view/widgets/audio_player_s
 import 'package:untitled/features/Koran/data/model/ayah.dart';
 import 'package:untitled/features/audio/quran_player.dart';
 import 'package:untitled/features/audio/downloads_view.dart';
+import 'package:untitled/features/Koran/presentation/view/flow_sura_view.dart';
+import 'package:untitled/core/app_theme.dart';
 
 class VerseListView extends StatefulWidget {
   final int suraNumber;
@@ -209,8 +211,25 @@ class _VerseListViewState extends State<VerseListView> {
     return true;
   }
 
+  Widget _modeToggle() {
+    final flow = AppSettings.instance.flowReading;
+    return IconButton(
+      tooltip: flow ? "عرض الآيات كبطاقات" : "عرض متصل كالمصحف",
+      icon: Icon(flow ? Icons.view_agenda_rounded : Icons.subject_rounded,
+          color: Colors.white),
+      onPressed: () => AppSettings.instance.update(flowReading: !flow),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (AppSettings.instance.flowReading) {
+      return FlowSuraView(
+        sura: widget.suraNumber,
+        suraName: widget.SuraName,
+        modeToggle: _modeToggle(),
+      );
+    }
     return BlocProvider(
       create: (_) =>
           VerseCubit(QuranRepository())
@@ -260,6 +279,7 @@ class _VerseListViewState extends State<VerseListView> {
                           pinned: true,
                           leading: const BackButton(color: Colors.white),
                           actions: [
+                            _modeToggle(),
                             SuraDownloadButton(sura: widget.suraNumber),
                           ],
                           backgroundColor: const Color(0xFF00695C),
