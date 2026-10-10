@@ -78,6 +78,9 @@ class _FlowSuraViewState extends State<FlowSuraView> {
     }
     await showModalBottomSheet(
       context: context,
+      // size to content; long meanings scroll instead of overflowing
+      isScrollControlled: true,
+      useSafeArea: true,
       builder: (_) =>
           _WordSheet(word: w, suraName: widget.suraName, parent: context),
     );
@@ -267,7 +270,7 @@ class _WordSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SafeArea(
-      child: Padding(
+      child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
         child: Column(
           mainAxisSize: MainAxisSize.min,
