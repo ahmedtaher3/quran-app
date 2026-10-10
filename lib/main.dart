@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:just_audio_background/just_audio_background.dart';
 import 'package:untitled/features/audio/quran_player.dart';
+import 'package:untitled/features/audio/audio_downloads.dart';
 import 'loading_screen.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
@@ -13,6 +14,7 @@ void main() async {
     androidNotificationOngoing: true,
   );
   await QuranPlayer.instance.loadPrefs();
+  await AudioDownloads.instance.init();
   QuranPlayer.instance.startLogging();
   runApp(const MyApp());
 }

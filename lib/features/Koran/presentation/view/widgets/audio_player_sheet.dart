@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:untitled/features/Koran/data/model/ayah.dart';
 import 'package:untitled/features/audio/quran_player.dart';
+import 'package:untitled/features/audio/downloads_view.dart';
 
 const _teal = Color(0xFF00695C);
 
@@ -123,6 +124,18 @@ class _PlayerSheetState extends State<PlayerSheet> {
                 subtitle: Text(qp.reciterName),
                 trailing: const Icon(Icons.chevron_right_rounded), // mirrored in RTL
                 onTap: _pickReciter,
+              ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading:
+                    const Icon(Icons.download_for_offline_rounded, color: _teal),
+                title: const Text("التنزيلات"),
+                subtitle: const Text("استمع بدون إنترنت"),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const DownloadsView()),
+                ),
               ),
               if (widget.onPlaySequential != null) ...[
                 const SizedBox(height: 8),

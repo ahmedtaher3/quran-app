@@ -8,6 +8,7 @@ import 'package:untitled/features/Koran/presentation/view/widgets/verse_card.dar
 import 'package:untitled/features/Koran/presentation/view/widgets/audio_player_sheet.dart';
 import 'package:untitled/features/Koran/data/model/ayah.dart';
 import 'package:untitled/features/audio/quran_player.dart';
+import 'package:untitled/features/audio/downloads_view.dart';
 
 class VerseListView extends StatefulWidget {
   final int suraNumber;
@@ -257,6 +258,9 @@ class _VerseListViewState extends State<VerseListView> {
                           floating: false,
                           pinned: true,
                           leading: const BackButton(color: Colors.white),
+                          actions: [
+                            SuraDownloadButton(sura: widget.suraNumber),
+                          ],
                           backgroundColor: const Color(0xFF00695C),
                           flexibleSpace: FlexibleSpaceBar(
                             centerTitle: true,

@@ -7,6 +7,7 @@ import 'package:just_audio_background/just_audio_background.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:untitled/features/Koran/data/data_sources/local/db_helper.dart';
 import 'package:untitled/features/Koran/data/model/ayah.dart';
+import 'package:untitled/features/audio/audio_downloads.dart';
 
 class Reciter {
   final String id; // "<bitrate>/<edition>" on cdn.islamic.network
@@ -203,9 +204,22 @@ class QuranPlayer {
     await p.setBool('loop_range', loopRange);
   }
 
-  String urlFor(Verse v) =>
+  String _remoteUrl(Verse v) =>
       _timing[v.id]?.url ??
       'https://cdn.islamic.network/quran/audio/$reciterId/${v.id}.mp3';
+
+  /// Same urls playback would stream, so downloads keep word timings aligned.
+  Future<List<String>> remoteUrls(List<Verse> verses) async {
+    await _loadTiming(verses);
+    return verses.map(_remoteUrl).toList();
+  }
+
+  AudioSource _sourceFor(Verse v, MediaItem tag) {
+    final local = AudioDownloads.instance.localFile(reciterId, v.id);
+    return local != null
+        ? AudioSource.file(local.path, tag: tag)
+        : AudioSource.uri(Uri.parse(_remoteUrl(v)), tag: tag);
+  }
 
   String get reciterName =>
       reciters.firstWhere((r) => r.id == reciterId, orElse: () => reciters[0]).name;
@@ -220,9 +234,9 @@ class QuranPlayer {
     final sources = <AudioSource>[
       for (final v in verses)
         for (var r = 0; r < _repeatEach; r++)
-          AudioSource.uri(
-            Uri.parse(urlFor(v)),
-            tag: MediaItem(
+          _sourceFor(
+            v,
+            MediaItem(
               id: '${v.id}-$r',
               album: reciterName,
               title:
