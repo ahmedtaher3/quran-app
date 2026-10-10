@@ -8,7 +8,7 @@ import 'package:untitled/features/Koran/presentation/manager/cubit/verse_cubit.d
 import 'package:untitled/features/Koran/presentation/view/widgets/audio_player_sheet.dart';
 import 'package:untitled/words_dialog.dart';
 import 'package:untitled/features/tafsir/tafsir_sheet.dart';
-import 'package:untitled/core/constants/app_constants.dart';
+import 'package:untitled/features/audio/quran_player.dart';
 
 class VerseCard extends StatelessWidget {
   final Verse verse;
@@ -211,23 +211,13 @@ class VerseCard extends StatelessWidget {
                 IconButton.filled(
                   icon: const Icon(Icons.play_arrow_rounded),
                   onPressed: () {
-                    final url =
-                        "${AppConstants.verseAudioBaseUrl}${verse.audio}";
-                    showModalBottomSheet(
-                      context: context,
-                      isScrollControlled: true,
-                      backgroundColor: Colors.transparent,
-                      builder: (sheetContext) => AudioPlayerSheet(
-                        audioUrl: url,
-                        suraName: verse.text ?? '',
-                        ayaNumber: verse.ayaNumber,
-                        onPlaySequential: () {
-                          // Using context from VerseCard to access VerseCubit
-                          context
-                              .read<VerseCubit>()
-                              .playSequentiallyFrom(verse.id);
-                        },
-                      ),
+                    final cubit = context.read<VerseCubit>();
+                    QuranPlayer.instance
+                        .play([verse], suraName: cubit.suraName);
+                    showPlayerSheet(
+                      context,
+                      onPlaySequential: () =>
+                          cubit.playSequentiallyFrom(verse.id),
                     );
                   },
                   style: IconButton.styleFrom(

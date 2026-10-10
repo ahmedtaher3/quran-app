@@ -5,6 +5,9 @@ import 'package:untitled/features/Koran/data/repo/quran_repository.dart';
 import 'package:untitled/features/Koran/presentation/manager/cubit/verse_cubit.dart';
 import 'package:untitled/features/Koran/presentation/manager/cubit/verse_state.dart';
 import 'package:untitled/features/Koran/presentation/view/widgets/verse_card.dart';
+import 'package:untitled/features/Koran/presentation/view/widgets/audio_player_sheet.dart';
+import 'package:untitled/features/Koran/data/model/ayah.dart';
+import 'package:untitled/features/audio/quran_player.dart';
 
 class VerseListView extends StatefulWidget {
   final int suraNumber;
@@ -208,7 +211,9 @@ class _VerseListViewState extends State<VerseListView> {
   Widget build(BuildContext context) {
     return BlocProvider(
       create: (_) =>
-          VerseCubit(QuranRepository())..loadVerses(widget.suraNumber,
+          VerseCubit(QuranRepository())
+            ..suraName = widget.SuraName
+            ..loadVerses(widget.suraNumber,
               skipContinueDialog: widget.ayaNumber != null),
       child: BlocBuilder<VerseCubit, VerseState>(
         builder: (context, state) {
@@ -431,18 +436,22 @@ class _VerseListViewState extends State<VerseListView> {
                   ); // NotificationListener
                 },
               ),
-              floatingActionButton: state is VerseLoaded
-                  ? _PlayAllButton(
-                      isPlaying: state.playingAyahId != null,
-                      onTap: () {
-                        if (state.playingAyahId != null) {
-                          context.read<VerseCubit>().stopSequentialPlay();
-                        } else {
-                          context.read<VerseCubit>().startSequentialPlay();
-                        }
-                      },
-                    )
-                  : null,
+              floatingActionButton: state is! VerseLoaded
+                  ? null
+                  : state.playingAyahId != null
+                      ? _MiniPlayer(
+                          verse: state.verses.firstWhere(
+                              (v) => v.id == state.playingAyahId,
+                              orElse: () => state.verses.first),
+                          suraName: widget.SuraName,
+                          onStop: () =>
+                              context.read<VerseCubit>().stopSequentialPlay(),
+                        )
+                      : _PlayAllButton(
+                          isPlaying: false,
+                          onTap: () =>
+                              context.read<VerseCubit>().startSequentialPlay(),
+                        ),
               floatingActionButtonLocation:
                   FloatingActionButtonLocation.centerFloat,
             ),
@@ -507,6 +516,89 @@ class _PlayAllButton extends StatelessWidget {
                     fontWeight: FontWeight.bold,
                     
                   ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MiniPlayer extends StatelessWidget {
+  final Verse verse;
+  final String suraName;
+  final VoidCallback onStop;
+  const _MiniPlayer(
+      {required this.verse, required this.suraName, required this.onStop});
+
+  @override
+  Widget build(BuildContext context) {
+    final qp = QuranPlayer.instance;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: Material(
+        elevation: 8,
+        shadowColor: Colors.teal.withOpacity(0.3),
+        color: const Color(0xFF004D40),
+        borderRadius: BorderRadius.circular(24),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(24),
+          onTap: () => showPlayerSheet(context),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            child: Row(
+              children: [
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text("$suraName - آية ${verse.ayaNumber}",
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold)),
+                      Text(qp.reciterName,
+                          maxLines: 1,
+                          style: const TextStyle(
+                              color: Colors.white70, fontSize: 12)),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  tooltip: "الآية السابقة",
+                  icon: const Icon(Icons.skip_next_rounded, color: Colors.white),
+                  onPressed: qp.previous,
+                ),
+                StreamBuilder<bool>(
+                  stream: qp.player.playingStream,
+                  initialData: qp.player.playing,
+                  builder: (_, snap) => IconButton(
+                    icon: Icon(
+                        snap.data == true
+                            ? Icons.pause_circle_filled_rounded
+                            : Icons.play_circle_fill_rounded,
+                        color: Colors.white,
+                        size: 40),
+                    onPressed: () => snap.data == true
+                        ? qp.player.pause()
+                        : qp.player.play(),
+                  ),
+                ),
+                IconButton(
+                  tooltip: "الآية التالية",
+                  icon: const Icon(Icons.skip_previous_rounded,
+                      color: Colors.white),
+                  onPressed: qp.next,
+                ),
+                IconButton(
+                  tooltip: "إيقاف",
+                  icon: const Icon(Icons.close_rounded, color: Colors.white70),
+                  onPressed: onStop,
                 ),
               ],
             ),

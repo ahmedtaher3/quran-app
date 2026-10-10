@@ -1,11 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:untitled/AudioManager.dart';
 import 'package:untitled/features/Koran/presentation/manager/cubit/verse_state.dart';
-import 'package:untitled/core/constants/app_constants.dart';
 import 'package:untitled/features/Koran/data/data_sources/local/db_helper.dart';
 import 'package:untitled/features/Koran/data/model/ayah.dart';
 import 'package:untitled/features/Koran/data/model/bookmark.dart';
+import 'package:untitled/features/audio/quran_player.dart';
 import '../../../data/repo/quran_repository.dart';
 
 class VerseCubit extends Cubit<VerseState> {
@@ -13,11 +14,41 @@ class VerseCubit extends Cubit<VerseState> {
 
   int? lastViewedAyahId;
   int? currentSuraNumber; // <<< الجديد
+  String? suraName;
   bool shouldShowContinueDialog = false;
+  int? playingAyahId;
+  List<Verse> _verses = [];
 
   Map<int, Bookmark> bookmarks = {};
 
-  VerseCubit(this.repo) : super(VerseInitial());
+  StreamSubscription<Verse?>? _audioSub;
+
+  VerseCubit(this.repo) : super(VerseInitial()) {
+    _audioSub = QuranPlayer.instance.currentVerse.listen(_onPlayingVerse);
+  }
+
+  void _onPlayingVerse(Verse? v) {
+    final here = v != null && v.sura == currentSuraNumber;
+    playingAyahId = here ? v.id : null;
+    if (here) {
+      // تحديث آخر آية تم الوصول إليها تلقائياً مع التشغيل
+      updateReadingPosition(v.sura, v.id);
+    } else {
+      _emit();
+    }
+  }
+
+  void _emit({bool showContinueDialog = false, bool force = false}) {
+    if (force || state is VerseLoaded) {
+      emit(VerseLoaded(
+        _verses,
+        bookmarks: bookmarks,
+        lastViewedAyahId: lastViewedAyahId,
+        showContinueDialog: showContinueDialog,
+        playingAyahId: playingAyahId,
+      ));
+    }
+  }
 
   /// [skipContinueDialog]: opened at a specific ayah, so don't ask.
   Future<void> loadVerses(int suraNumber,
@@ -26,21 +57,21 @@ class VerseCubit extends Cubit<VerseState> {
     try {
       emit(VerseLoading());
 
-      final verses = await repo.getVersesBySura(suraNumber);
+      _verses = await repo.getVersesBySura(suraNumber);
       bookmarks = {
         for (final b in await DBHelper.getBookmarks(sura: suraNumber))
           b.verseId: b
       };
 
-      await loadLastViewedAyah(suraNumber, verses);
+      await loadLastViewedAyah(suraNumber, _verses);
+      final cur = QuranPlayer.instance.current;
+      if (QuranPlayer.instance.player.playing && cur?.sura == suraNumber) {
+        playingAyahId = cur!.id;
+        shouldShowContinueDialog = false;
+      }
       if (skipContinueDialog) shouldShowContinueDialog = false;
 
-      emit(VerseLoaded(
-        verses,
-        bookmarks: bookmarks,
-        lastViewedAyahId: lastViewedAyahId,
-        showContinueDialog: shouldShowContinueDialog,
-      ));
+      _emit(showContinueDialog: shouldShowContinueDialog, force: true);
     } catch (e) {
       emit(VerseError(e.toString()));
     }
@@ -68,36 +99,20 @@ class VerseCubit extends Cubit<VerseState> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove("last_ayah_$suraNumber");
     lastViewedAyahId = null;
-
     shouldShowContinueDialog = false;
-
-    if (state is VerseLoaded) {
-      final verses = (state as VerseLoaded).verses;
-      emit(VerseLoaded(
-        verses,
-        bookmarks: bookmarks,
-        lastViewedAyahId: null,
-        showContinueDialog: false,
-      ));
-    }
+    _emit();
   }
 
   /// ⬅️ دي اللي UI بيستخدمها علشان ينط للآية المحفوظة
-  void continueFromLastAyah() {
-    if (state is VerseLoaded) {
-      final verses = (state as VerseLoaded).verses;
-
-      emit(VerseLoaded(
-        verses,
-        bookmarks: bookmarks,
-        lastViewedAyahId: lastViewedAyahId,
-        showContinueDialog: false,
-      ));
-    }
-  }
+  void continueFromLastAyah() => _emit();
 
   Future<void> updateReadingPosition(int suraNumber, int ayahId) async {
-    if (lastViewedAyahId == ayahId) return;
+    if (lastViewedAyahId == ayahId) {
+      _emit(); // playingAyahId may still have changed
+      return;
+    }
+    lastViewedAyahId = ayahId;
+    _emit();
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt("last_ayah_$suraNumber", ayahId);
@@ -105,95 +120,27 @@ class VerseCubit extends Cubit<VerseState> {
     // 🔥 حفظ الموقع الأخير بشكل عام للوصول إليه من أي مكان
     await prefs.setInt("global_last_sura", suraNumber);
     await prefs.setInt("global_last_ayah_id", ayahId);
-
-    lastViewedAyahId = ayahId;
-
-    if (state is VerseLoaded) {
-      final verses = (state as VerseLoaded).verses;
-      emit(VerseLoaded(
-        verses,
-        bookmarks: bookmarks,
-        lastViewedAyahId: ayahId,
-        showContinueDialog: false,
-      ));
-    }
   }
 
   void startSequentialPlay() {
-    if (state is VerseLoaded) {
-      final verseLoaded = state as VerseLoaded;
-      final verses = verseLoaded.verses;
-      if (verses.isEmpty) return;
-
-      int startIndex = 0;
-      if (lastViewedAyahId != null) {
-        final savedIndex = verses.indexWhere((v) => v.id == lastViewedAyahId);
-        if (savedIndex != -1) {
-          startIndex = savedIndex;
-        }
-      }
-      _playVerseAt(startIndex);
-    }
+    if (_verses.isEmpty) return;
+    final saved = _verses.indexWhere((v) => v.id == lastViewedAyahId);
+    _playFrom(saved == -1 ? 0 : saved);
   }
 
   void playSequentiallyFrom(int verseId) {
-    if (state is VerseLoaded) {
-      final verses = (state as VerseLoaded).verses;
-      final index = verses.indexWhere((v) => v.id == verseId);
-      if (index != -1) {
-        _playVerseAt(index);
-      }
-    }
+    final index = _verses.indexWhere((v) => v.id == verseId);
+    if (index != -1) _playFrom(index);
   }
 
-  void _playVerseAt(int index) {
-    if (state is VerseLoaded) {
-      final verses = (state as VerseLoaded).verses;
-      if (index >= verses.length) {
-        stopSequentialPlay();
-        return;
-      }
-
-      final verse = verses[index];
-      final url = "${AppConstants.verseAudioBaseUrl}${verse.audio}";
-
-      // تحديث آخر آية تم الوصول إليها تلقائياً مع التشغيل
-      lastViewedAyahId = verse.id;
-      DBHelper.logVerses([verse.id]);
-      if (currentSuraNumber != null) {
-        updateReadingPosition(currentSuraNumber!, verse.id);
-      }
-
-      // تحديث الحالة لتمييز الآية الحالية
-      emit(VerseLoaded(
-        verses,
-        bookmarks: bookmarks,
-        lastViewedAyahId: verse.id,
-        showContinueDialog: false,
-        playingAyahId: verse.id,
-      ));
-
-      AudioManager.playAyah(url);
-
-      // ضبط الانتقال للآية التالية عند الانتهاء
-      AudioManager.setOnComplete(() {
-        _playVerseAt(index + 1);
-      });
-    }
+  void _playFrom(int index) {
+    QuranPlayer.instance.play(_verses, start: index, suraName: suraName);
   }
 
   void stopSequentialPlay() {
-    if (state is VerseLoaded) {
-      final verses = (state as VerseLoaded).verses;
-      AudioManager.stop();
-      emit(VerseLoaded(
-        verses,
-        bookmarks: bookmarks,
-        lastViewedAyahId: lastViewedAyahId,
-        showContinueDialog: false,
-        playingAyahId: null,
-      ));
-    }
+    QuranPlayer.instance.stop();
+    playingAyahId = null;
+    _emit();
   }
 
   Future<void> saveBookmark(Verse verse, int color, String? note) async {
@@ -208,29 +155,23 @@ class VerseCubit extends Cubit<VerseState> {
     );
     await DBHelper.upsertBookmark(b);
     bookmarks = {...bookmarks, verse.id: b};
-    _reemit();
+    _emit();
   }
 
   Future<void> removeBookmark(int verseId) async {
     await DBHelper.deleteBookmark(verseId);
     bookmarks = Map.of(bookmarks)..remove(verseId);
-    _reemit();
-  }
-
-  void _reemit() {
-    final s = state;
-    if (s is VerseLoaded) {
-      emit(VerseLoaded(
-        s.verses,
-        bookmarks: bookmarks,
-        lastViewedAyahId: s.lastViewedAyahId,
-        playingAyahId: s.playingAyahId,
-      ));
-    }
+    _emit();
   }
 
   /// ⬅️ علشان نقفل الدايلوج بعد ما يظهر مرة
   void clearDialogFlag() {
     shouldShowContinueDialog = false;
+  }
+
+  @override
+  Future<void> close() {
+    _audioSub?.cancel(); // playback itself continues in the background
+    return super.close();
   }
 }

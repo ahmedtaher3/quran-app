@@ -1,10 +1,19 @@
 import 'package:flutter/material.dart';
 
+import 'package:just_audio_background/just_audio_background.dart';
+import 'package:untitled/features/audio/quran_player.dart';
 import 'loading_screen.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await JustAudioBackground.init(
+    androidNotificationChannelId: 'com.tarik.al.quran.audio',
+    androidNotificationChannelName: 'تلاوة القرآن',
+    androidNotificationOngoing: true,
+  );
+  await QuranPlayer.instance.loadPrefs();
+  QuranPlayer.instance.startLogging();
   runApp(const MyApp());
 }
 //  Navigator.push(

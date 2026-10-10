@@ -1,6 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:untitled/AudioManager.dart';
+import 'package:untitled/features/audio/quran_player.dart';
 
 import 'features/Koran/data/model/word.dart';
 import 'core/constants/app_constants.dart';
@@ -71,7 +71,7 @@ class WordsDialog extends StatelessWidget {
                         if (word.audio.isNotEmpty) {
                           final url =
                               "${AppConstants.wordAudioBaseUrl}${word.audio}";
-                          AudioManager.playAyah(url);
+                          QuranPlayer.instance.playClip(url, title: word.text);
                         }
 
                         // Show meaning if it has one or if it's special
