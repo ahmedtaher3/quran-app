@@ -5,6 +5,8 @@ class Word {
   final String charType;
   final String code;
   final String codeV3;
+  final String? meaning; // reviewed meaning (tool/meanings); null = not reviewed
+  final String? meaningSrc;
   final int id;
   final String simple;
   final int sura;
@@ -18,6 +20,8 @@ class Word {
     required this.charType,
     required this.code,
     required this.codeV3,
+    this.meaning,
+    this.meaningSrc,
     required this.id,
     required this.simple,
     required this.sura,
@@ -32,6 +36,8 @@ class Word {
     charType: json['char_type'] ?? '',
     code: json['code'] ?? '',
     codeV3: json['code_v3'] ?? '',
+    meaning: json['meaning'],
+    meaningSrc: json['meaning_src'],
     id: json['id'] ?? 0,
     simple: json['simple'] ?? '',
     sura: json['sura'] ?? 0,
@@ -46,10 +52,15 @@ class Word {
     'char_type': charType,
     'code': code,
     'code_v3': codeV3,
+    'meaning': meaning,
+    'meaning_src': meaningSrc,
     'id': id,
     'simple': simple,
     'sura': sura,
     'text': text,
     'translation': translation,
   };
+
+  /// Reviewed meaning when available, else the original unreviewed one.
+  String get displayMeaning => meaningSrc != null ? (meaning ?? '') : codeV3;
 }

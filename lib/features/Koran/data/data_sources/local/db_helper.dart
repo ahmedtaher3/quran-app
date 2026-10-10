@@ -15,7 +15,7 @@ class DBHelper {
 
     _db = await openDatabase(
       path,
-      version: 7, // Bumping version to force recreate/upgrade
+      version: 8, // 8: words.meaning/meaning_src (content re-import, user tables kept)
       onCreate: (db, version) async {
         await _createDb(db);
       },
@@ -174,7 +174,8 @@ class DBHelper {
   static Future<List<Map<String, Object?>>> getFlowWords(int sura) async {
     final db = await database;
     return db.rawQuery('''
-      SELECT w.id, w.text, w.audio, w.translation, w.code_v3, w.ayaID,
+      SELECT w.id, w.text, w.audio, w.translation, w.code_v3, w.meaning,
+             w.meaning_src, w.ayaID,
              v.ayaNumber, v.page
       FROM words w JOIN verses v ON v.id = w.ayaID
       WHERE w.sura = ? AND w.char_type = 'word'
@@ -230,6 +231,8 @@ class DBHelper {
             char_type TEXT,
             code TEXT,
             code_v3 TEXT,
+            meaning TEXT,
+            meaning_src TEXT,
             simple TEXT,
             sura INTEGER,
             text TEXT,

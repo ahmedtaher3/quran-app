@@ -14,6 +14,7 @@ class FlowWord {
   final int id, ayahId, aya, page;
   final String text, audio, english;
   final String arabic; // Arabic meaning; often shared by a short phrase
+  final String? source; // tafsir the meaning was checked against
   bool get hasMeaning => arabic.isNotEmpty;
   FlowWord(Map<String, Object?> r)
       : id = r['id'] as int,
@@ -23,7 +24,11 @@ class FlowWord {
         text = r['text'] as String? ?? '',
         audio = r['audio'] as String? ?? '',
         english = r['translation'] as String? ?? '',
-        arabic = (r['code_v3'] as String? ?? '').trim();
+        arabic = ((r['meaning_src'] != null ? r['meaning'] : r['code_v3'])
+                    as String? ??
+                '')
+            .trim(),
+        source = r['meaning_src'] as String?;
 }
 
 /// Continuous mushaf-style reading: one justified paragraph per mushaf
@@ -218,6 +223,12 @@ class _PageParagraphState extends State<_PageParagraph> {
   }
 }
 
+const _sourceNames = {
+  'muyassar': 'التفسير الميسر',
+  'mukhtasar': 'المختصر في تفسير القرآن',
+  'saadi': 'تفسير السعدي',
+};
+
 Widget _meaningBox(String label, String text,
     {required bool rtl, required bool big}) {
   return Container(
@@ -269,6 +280,12 @@ class _WordSheet extends StatelessWidget {
             const SizedBox(height: 16),
             if (word.hasMeaning)
               _meaningBox("المعنى", word.arabic, rtl: true, big: true),
+            if (word.hasMeaning && word.source != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text("المصدر: ${_sourceNames[word.source] ?? word.source}",
+                    style: TextStyle(color: AppColors.subtle, fontSize: 12)),
+              ),
             if (word.english.isNotEmpty) ...[
               const SizedBox(height: 8),
               _meaningBox("الترجمة", word.english, rtl: false, big: false),

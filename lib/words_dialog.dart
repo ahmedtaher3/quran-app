@@ -64,7 +64,7 @@ class WordsDialog extends StatelessWidget {
                   runSpacing: 12,
                   alignment: WrapAlignment.center,
                   children: words.map((word) {
-                    final isSpecial = word.codeV3.isNotEmpty;
+                    final isSpecial = word.displayMeaning.isNotEmpty;
 
                     return GestureDetector(
                       onTap: () {
@@ -160,7 +160,7 @@ class WordsDialog extends StatelessWidget {
                                         ),
                                         SizedBox(height: 12),
                                         Text(
-                                          word.codeV3,
+                                          word.displayMeaning,
                                           textAlign: TextAlign.center,
                                           style: TextStyle(
                                             fontSize: 16,
