@@ -18,15 +18,13 @@ for w in words:
     if w["char_type"] == "word":
         by_ayah.setdefault(w["ayaID"], []).append(w)
 
-last_saadi = {}
 for s in range(1, 115):
     packet = []
     for v in (x for x in ayat if x["sura"] == s):
         key = f"{s}:{v['ayaNumber']}"
-        # Sa'di groups some ayat; the text sits on the group's first ayah
-        saadi = sd.get(key) or last_saadi.get(s, "")
-        if key in sd:
-            last_saadi[s] = sd[key]
+        # Sa'di groups some ayat under one text; ayat without their own
+        # entry get none (guessing the group mis-attributes text)
+        saadi = sd.get(key, "")
         packet.append({
             "key": key,
             "text": v["text"],
