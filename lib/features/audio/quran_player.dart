@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 
 import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_background/just_audio_background.dart';
@@ -30,6 +32,36 @@ const reciters = [
   Reciter('192/ar.abdullahbasfar', 'عبد الله بصفر'),
   Reciter('192/ar.hanirifai', 'هاني الرفاعي'),
 ];
+
+/// quran.com recitation ids for reciters that have word timings.
+const _qdcIds = {
+  '128/ar.alafasy': 7,
+  '192/ar.abdulbasitmurattal': 2,
+  '128/ar.husary': 6,
+  '128/ar.minshawi': 9,
+  '64/ar.minshawimujawwad': 8,
+  '192/ar.abdurrahmaansudais': 3,
+  '64/ar.saoodshuraym': 10,
+  '128/ar.shaatree': 4,
+  '192/ar.hanirifai': 5,
+};
+
+/// Audio url + word segments ([_, wordPos, startMs, endMs]) for one verse.
+class VerseTiming {
+  final String url;
+  final List<List<int>> segments;
+  VerseTiming(this.url, this.segments);
+
+  /// Last word that has started by [ms]; holds through the gaps between
+  /// words so the highlight doesn't flicker.
+  int? wordAt(int ms) {
+    int? word;
+    for (final s in segments) {
+      if (s.length >= 4 && ms >= s[2]) word = s[1];
+    }
+    return word;
+  }
+}
 
 /// The app's only audio player (just_audio_background allows one).
 /// A queue is a list of verses; "repeat each ayah N times" is done by
@@ -77,6 +109,81 @@ class QuranPlayer {
     return _queue[(i ~/ _repeatEach).clamp(0, _queue.length - 1)];
   }
 
+  /// verseId -> timing, for the current reciter's loaded suras.
+  final Map<int, VerseTiming> _timing = {};
+  String? _timingReciter;
+
+  bool get hasWordTiming => _qdcIds.containsKey(reciterId);
+
+  /// 1-based position of the word being recited, or null.
+  late final Stream<int?> currentWord = player.positionStream
+      .map((pos) => _timing[current?.id]?.wordAt(pos.inMilliseconds))
+      .distinct()
+      .asBroadcastStream();
+
+  Future<void> _loadTiming(List<Verse> verses) async {
+    final rec = _qdcIds[reciterId];
+    if (_timingReciter != reciterId) {
+      _timing.clear();
+      _timingReciter = reciterId;
+    }
+    if (rec == null) return;
+    final suras = verses.map((v) => v.sura).toSet();
+    for (final sura in suras) {
+      if (verses.any((v) => v.sura == sura && !_timing.containsKey(v.id))) {
+        try {
+          final files = await _fetchChapter(rec, sura);
+          final idByKey = {
+            for (final v in verses.where((v) => v.sura == sura))
+              '${v.sura}:${v.ayaNumber}': v.id
+          };
+          for (final f in files) {
+            final id = idByKey[f['verse_key']];
+            if (id == null) continue;
+            _timing[id] = VerseTiming(
+              _absUrl(f['url'] as String),
+              [
+                for (final seg in (f['segments'] as List? ?? []))
+                  // some recitations send numbers as strings
+                  [for (final n in seg as List) num.parse('$n').toInt()]
+              ],
+            );
+          }
+        } catch (_) {
+          // offline/API down: fall back to plain audio without word timing
+        }
+      }
+    }
+  }
+
+  static String _absUrl(String u) => u.startsWith('http')
+      ? u
+      : u.startsWith('//')
+          ? 'https:$u'
+          : 'https://verses.quran.com/$u';
+
+  Future<List> _fetchChapter(int rec, int sura) async {
+    final db = await DBHelper.database;
+    final hit = await db.query('audio_timing',
+        where: 'recitation = ? AND sura = ?', whereArgs: [rec, sura]);
+    if (hit.isNotEmpty) return jsonDecode(hit.first['json'] as String);
+
+    final client = HttpClient()..connectionTimeout = const Duration(seconds: 8);
+    try {
+      final req = await client.getUrl(Uri.parse(
+          'https://api.quran.com/api/v4/recitations/$rec/by_chapter/$sura?fields=segments&per_page=300'));
+      final res = await req.close();
+      if (res.statusCode != 200) throw HttpException('${res.statusCode}');
+      final files = jsonDecode(await res.transform(utf8.decoder).join())[
+          'audio_files'] as List;
+      await db.insert(
+          'audio_timing', {'recitation': rec, 'sura': sura, 'json': jsonEncode(files)});
+      return files;
+    } finally {
+      client.close();
+    }
+  }
+
   List<Verse> get queue => _queue;
   String? get suraName => _suraName;
 
@@ -97,6 +204,7 @@ class QuranPlayer {
   }
 
   String urlFor(Verse v) =>
+      _timing[v.id]?.url ??
       'https://cdn.islamic.network/quran/audio/$reciterId/${v.id}.mp3';
 
   String get reciterName =>
@@ -105,6 +213,7 @@ class QuranPlayer {
   Future<void> play(List<Verse> verses,
       {int start = 0, String? suraName}) async {
     if (verses.isEmpty) return;
+    await _loadTiming(verses);
     _queue = verses;
     _suraName = suraName;
     _repeatEach = repeatEach;

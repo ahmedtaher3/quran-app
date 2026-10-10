@@ -416,6 +416,8 @@ class _VerseListViewState extends State<VerseListView> {
                                         key: _verseKeyFor(verse.id),
                                         verse: verse,
                                         bookmark: state.bookmarks[verse.id],
+                                        isPlaying:
+                                            verse.id == state.playingAyahId,
                                         highlight: verse.id ==
                                                 _flashHighlightVerseId ||
                                             verse.id ==

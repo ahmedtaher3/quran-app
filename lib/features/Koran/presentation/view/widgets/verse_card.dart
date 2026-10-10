@@ -14,13 +14,22 @@ class VerseCard extends StatelessWidget {
   final Verse verse;
   final bool highlight; // <<< الجديد
   final Bookmark? bookmark;
+  final bool isPlaying;
 
   const VerseCard({
     super.key,
     required this.verse,
     this.highlight = false,
     this.bookmark,
+    this.isPlaying = false,
   });
+
+  static final _verseStyle = TextStyle(
+    fontSize: 26,
+    height: 2.0,
+    color: Colors.black.withOpacity(0.85),
+    fontWeight: FontWeight.normal,
+  );
 
   bool isBasmala(String text) {
     final normalized = text
@@ -127,17 +136,14 @@ class VerseCard extends StatelessWidget {
                 if (bookmark != null)
                   _BookmarkBadge(bookmark: bookmark!),
                 // Arabic Text
-                Text(
-                  verse.text,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    
-                    fontSize: 26,
-                    height: 2.0,
-                    color: Colors.black.withOpacity(0.85),
-                    fontWeight: FontWeight.normal,
+                if (isPlaying)
+                  _RecitedText(text: verse.text, style: _verseStyle)
+                else
+                  Text(
+                    verse.text,
+                    textAlign: TextAlign.center,
+                    style: _verseStyle,
                   ),
-                ),
                 const SizedBox(height: 24),
                 // Aya Number Ornament
                 Stack(
@@ -291,6 +297,45 @@ class _BookmarkBadge extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Verse text with the word currently being recited highlighted.
+class _RecitedText extends StatelessWidget {
+  final String text;
+  final TextStyle style;
+  const _RecitedText({required this.text, required this.style});
+
+  @override
+  Widget build(BuildContext context) {
+    final words = text.split(RegExp(r'\s+'));
+    return StreamBuilder<int?>(
+      stream: QuranPlayer.instance.currentWord,
+      builder: (context, snap) {
+        final pos = snap.data; // 1-based
+        if (pos == null || pos > words.length) {
+          return Text(text, textAlign: TextAlign.center, style: style);
+        }
+        return Text.rich(
+          TextSpan(children: [
+            for (var i = 0; i < words.length; i++) ...[
+              TextSpan(
+                text: words[i],
+                style: i + 1 == pos
+                    ? TextStyle(
+                        color: Colors.teal.shade800,
+                        backgroundColor: const Color(0x33FFB300),
+                      )
+                    : null,
+              ),
+              if (i < words.length - 1) const TextSpan(text: ' '),
+            ],
+          ]),
+          textAlign: TextAlign.center,
+          style: style,
+        );
+      },
     );
   }
 }

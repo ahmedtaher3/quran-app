@@ -52,6 +52,12 @@ class DBHelper {
             PRIMARY KEY (source, sura, aya)
           )
         ''');
+        await db.execute('''
+          CREATE TABLE IF NOT EXISTS audio_timing (
+            recitation INTEGER, sura INTEGER, json TEXT,
+            PRIMARY KEY (recitation, sura)
+          )
+        ''');
       },
     );
     return _db!;
