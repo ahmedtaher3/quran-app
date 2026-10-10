@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:untitled/features/Koran/data/data_sources/local/db_helper.dart';
 import 'package:untitled/features/Koran/data/repo/quran_repository.dart';
 import 'package:untitled/features/Koran/presentation/manager/cubit/verse_cubit.dart';
 import 'package:untitled/features/Koran/presentation/manager/cubit/verse_state.dart';
@@ -132,6 +133,22 @@ class _VerseListViewState extends State<VerseListView> {
     return null;
   }
 
+  /// Verses fully or partly on screen — counted as read for stats.
+  List<int> _visibleAyahIds(List verses) {
+    final h = MediaQuery.of(context).size.height;
+    final ids = <int>[];
+    for (final v in verses) {
+      final ctx = verseKeys[v.id]?.currentContext;
+      final box = ctx?.findRenderObject() as RenderBox?;
+      if (box == null || !box.attached) continue;
+      final top = box.localToGlobal(Offset.zero).dy;
+      if (top < h && top + box.size.height > 0) ids.add(v.id);
+    }
+    return ids;
+  }
+
+  bool _loggedInitial = false;
+
   void _flashHighlight(int verseId) {
     if (!mounted) return;
     setState(() {
@@ -216,6 +233,7 @@ class _VerseListViewState extends State<VerseListView> {
                   return NotificationListener<ScrollEndNotification>(
                     onNotification: (_) {
                       if (state is VerseLoaded) {
+                        DBHelper.logVerses(_visibleAyahIds(state.verses));
                         final midAyah = _getMiddleAyahId(state.verses);
                         if (midAyah != null) {
                           innerContext.read<VerseCubit>().updateReadingPosition(
@@ -287,6 +305,18 @@ class _VerseListViewState extends State<VerseListView> {
                           child: BlocListener<VerseCubit, VerseState>(
                             listener: (context, state) {
                               if (state is VerseLoaded) {
+                                // short suras may never scroll: log what's
+                                // on screen after the reader had time to read
+                                if (!_loggedInitial) {
+                                  _loggedInitial = true;
+                                  Future.delayed(const Duration(seconds: 5),
+                                      () {
+                                    if (mounted) {
+                                      DBHelper.logVerses(
+                                          _visibleAyahIds(state.verses));
+                                    }
+                                  });
+                                }
                                 // التمرير للآية التي تعمل حالياً
                                 if (state.playingAyahId != null) {
                                   _scrollToPlayingVerse(state);

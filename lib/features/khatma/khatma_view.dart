@@ -73,6 +73,7 @@ class _KhatmaViewState extends State<KhatmaView> {
 
   Future<void> _completeWird() async {
     final k = _k!;
+    await DBHelper.logPages(k.wirdStart, k.wirdEnd);
     final next = k.copyWith(currentPage: k.wirdEnd + 1);
     if (next.finished) {
       await KhatmaStore.incrementCompleted();

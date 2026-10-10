@@ -159,6 +159,7 @@ class VerseCubit extends Cubit<VerseState> {
 
       // تحديث آخر آية تم الوصول إليها تلقائياً مع التشغيل
       lastViewedAyahId = verse.id;
+      DBHelper.logVerses([verse.id]);
       if (currentSuraNumber != null) {
         updateReadingPosition(currentSuraNumber!, verse.id);
       }

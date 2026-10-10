@@ -39,9 +39,64 @@ class DBHelper {
             created_at INTEGER
           )
         ''');
+        await db.execute('''
+          CREATE TABLE IF NOT EXISTS reading_log (
+            day TEXT,
+            verse_id INTEGER,
+            PRIMARY KEY (day, verse_id)
+          )
+        ''');
       },
     );
     return _db!;
+  }
+
+  static String dayKey(DateTime d) =>
+      "${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}";
+
+  static Future<void> logVerses(Iterable<int> verseIds) async {
+    if (verseIds.isEmpty) return;
+    final db = await database;
+    final day = dayKey(DateTime.now());
+    final batch = db.batch();
+    for (final id in verseIds) {
+      batch.rawInsert(
+          'INSERT OR IGNORE INTO reading_log (day, verse_id) VALUES (?, ?)',
+          [day, id]);
+    }
+    await batch.commit(noResult: true);
+  }
+
+  static Future<void> logPages(int from, int to) async {
+    final db = await database;
+    await db.rawInsert('''
+      INSERT OR IGNORE INTO reading_log (day, verse_id)
+      SELECT ?, id FROM verses WHERE page BETWEEN ? AND ?
+    ''', [dayKey(DateTime.now()), from, to]);
+  }
+
+  /// day -> verses read that day, newest first.
+  static Future<Map<String, int>> versesPerDay() async {
+    final db = await database;
+    final rows = await db.rawQuery(
+        'SELECT day, COUNT(*) AS n FROM reading_log GROUP BY day ORDER BY day DESC');
+    return {for (final r in rows) r['day'] as String: r['n'] as int};
+  }
+
+  /// Distinct verses / pages / suras ever read.
+  static Future<({int verses, int pages, int suras})> readTotals() async {
+    final db = await database;
+    final r = (await db.rawQuery('''
+      SELECT COUNT(DISTINCT v.id) AS verses,
+             COUNT(DISTINCT v.page) AS pages,
+             COUNT(DISTINCT v.sura) AS suras
+      FROM reading_log l JOIN verses v ON v.id = l.verse_id
+    ''')).first;
+    return (
+      verses: r['verses'] as int,
+      pages: r['pages'] as int,
+      suras: r['suras'] as int,
+    );
   }
 
   static Future<void> upsertBookmark(Bookmark b) async {

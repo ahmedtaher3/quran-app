@@ -7,6 +7,9 @@ import 'package:untitled/features/Koran/presentation/manager/sura_cubit/sura_sta
 import 'package:untitled/features/Koran/presentation/view/widgets/sura_view_deatils.dart';
 import 'package:untitled/search_view.dart';
 import 'package:untitled/features/khatma/khatma.dart';
+import 'package:untitled/features/stats/stats.dart';
+import 'package:untitled/features/stats/stats_view.dart';
+import 'package:untitled/features/Koran/data/data_sources/local/db_helper.dart';
 import 'package:untitled/features/khatma/khatma_view.dart';
 import 'package:untitled/features/Koran/presentation/view/bookmarks_view.dart';
 
@@ -27,6 +30,7 @@ class SuraView extends StatelessWidget {
                   pinned: true,
                   backgroundColor: const Color(0xFF00695C),
                   actions: [
+                    const _StreakAction(),
                     IconButton(
                       tooltip: "العلامات",
                       icon: const Icon(Icons.bookmarks_rounded,
@@ -338,6 +342,47 @@ class _LastReadWidget extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class _StreakAction extends StatefulWidget {
+  const _StreakAction();
+
+  @override
+  State<_StreakAction> createState() => _StreakActionState();
+}
+
+class _StreakActionState extends State<_StreakAction> {
+  int? _streak;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final days = (await DBHelper.versesPerDay()).keys.toSet();
+    if (mounted) setState(() => _streak = currentStreak(days, DateTime.now()));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // SuraCubit re-emits whenever we come back from reading
+    return BlocListener<SuraCubit, SuraState>(
+      listener: (_, __) => _load(),
+      child: TextButton.icon(
+        onPressed: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const StatsView()),
+        ).then((_) => _load()),
+        icon: const Icon(Icons.local_fire_department_rounded,
+            color: Color(0xFFFFB300)),
+        label: Text("${_streak ?? 0}",
+            style: const TextStyle(
+                color: Colors.white, fontWeight: FontWeight.bold)),
+      ),
     );
   }
 }
