@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:untitled/features/Koran/data/data_sources/local/db_helper.dart';
 import 'package:untitled/features/Koran/data/model/ayah.dart';
+import 'package:untitled/features/Koran/data/model/bookmark.dart';
+import 'package:untitled/features/Koran/presentation/view/widgets/bookmark_sheet.dart';
 import 'package:untitled/features/Koran/presentation/manager/cubit/verse_cubit.dart';
 import 'package:untitled/features/Koran/presentation/view/widgets/audio_player_sheet.dart';
 import 'package:untitled/words_dialog.dart';
@@ -10,11 +12,13 @@ import 'package:untitled/core/constants/app_constants.dart';
 class VerseCard extends StatelessWidget {
   final Verse verse;
   final bool highlight; // <<< الجديد
+  final Bookmark? bookmark;
 
   const VerseCard({
     super.key,
     required this.verse,
     this.highlight = false,
+    this.bookmark,
   });
 
   bool isBasmala(String text) {
@@ -96,7 +100,11 @@ class VerseCard extends StatelessWidget {
         color: highlight ? const Color(0xFFF1F8E9) : Colors.white,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
-          color: highlight ? Colors.teal.shade200 : Colors.white,
+          color: bookmark != null
+              ? Color(bookmark!.color)
+              : highlight
+                  ? Colors.teal.shade200
+                  : Colors.white,
           width: 2,
         ),
         boxShadow: [
@@ -115,6 +123,8 @@ class VerseCard extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
             child: Column(
               children: [
+                if (bookmark != null)
+                  _BookmarkBadge(bookmark: bookmark!),
                 // Arabic Text
                 Text(
                   verse.text,
@@ -180,20 +190,21 @@ class VerseCard extends StatelessWidget {
                   onTap: () => _showTafsir(context),
                 ),
                 _ActionButton(
-                  icon: Icons.bookmark_rounded,
-                  color: highlight ? Colors.teal : Colors.grey.shade400,
+                  icon: bookmark != null
+                      ? Icons.bookmark_rounded
+                      : Icons.bookmark_border_rounded,
+                  color: bookmark != null
+                      ? Color(bookmark!.color)
+                      : Colors.grey.shade500,
                   onTap: () async {
-                    int suraNumber = verse.sura;
-                    await context
-                        .read<VerseCubit>()
-                        .saveLastViewedAyah(suraNumber, verse.id);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text("تم حفظ موضع القراءة"),
-                        behavior: SnackBarBehavior.floating,
-                        backgroundColor: Color(0xFF00695C),
-                      ),
-                    );
+                    final cubit = context.read<VerseCubit>();
+                    final r = await showBookmarkSheet(context, bookmark);
+                    if (r == null) return;
+                    if (r.color == null) {
+                      await cubit.removeBookmark(verse.id);
+                    } else {
+                      await cubit.saveBookmark(verse, r.color!, r.note);
+                    }
                   },
                 ),
                 IconButton.filled(
@@ -351,6 +362,38 @@ class _ActionButton extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
         ),
         child: Icon(icon, color: color, size: 22),
+      ),
+    );
+  }
+}
+
+class _BookmarkBadge extends StatelessWidget {
+  final Bookmark bookmark;
+  const _BookmarkBadge({required this.bookmark});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = Color(bookmark.color);
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: c.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.bookmark_rounded, color: c, size: 18),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              bookmark.note ?? "علامة محفوظة",
+              style: TextStyle(fontSize: 14, color: c, height: 1.5),
+            ),
+          ),
+        ],
       ),
     );
   }

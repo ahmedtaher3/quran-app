@@ -1,5 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:untitled/features/Koran/data/data_sources/local/db_helper.dart';
 import '../../../data/repo/quran_repository.dart';
 import '../../../data/model/sura.dart';
 import 'sura_state.dart';
@@ -17,23 +18,22 @@ class SuraCubit extends Cubit<SuraState> {
 
       allSuras = await repo.getAllSuras();
 
-      // تحميل موضع القراءة الأخير أيضاً
-      final prefs = await SharedPreferences.getInstance();
-      final lastSura = prefs.getInt("global_last_sura");
-
-      emit(SuraLoaded(allSuras, lastReadSura: lastSura));
+      await refreshLastRead(force: true);
     } catch (e) {
       emit(SuraError(e.toString()));
     }
   }
 
   // فنكشن لتحديث موضع القراءة فوراً في الواجهة
-  Future<void> refreshLastRead() async {
-    if (state is SuraLoaded) {
-      final prefs = await SharedPreferences.getInstance();
-      final lastSura = prefs.getInt("global_last_sura");
-      emit(SuraLoaded(allSuras, lastReadSura: lastSura));
-    }
+  Future<void> refreshLastRead({bool force = false}) async {
+    if (!force && state is! SuraLoaded) return;
+    final prefs = await SharedPreferences.getInstance();
+    final lastSura = prefs.getInt("global_last_sura");
+    final lastAyahId = prefs.getInt("global_last_ayah_id");
+    final verse =
+        lastAyahId == null ? null : await DBHelper.getVerseById(lastAyahId);
+    emit(SuraLoaded(allSuras,
+        lastReadSura: lastSura, lastReadAya: verse?.ayaNumber));
   }
 
   void searchSuras(String query) {

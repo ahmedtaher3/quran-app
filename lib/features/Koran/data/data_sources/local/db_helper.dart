@@ -1,6 +1,7 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'package:untitled/features/Koran/data/model/ayah.dart';
+import 'package:untitled/features/Koran/data/model/bookmark.dart';
 import 'package:untitled/features/Koran/data/model/sura.dart';
 import 'package:untitled/features/Koran/data/model/word.dart';
 
@@ -25,8 +26,56 @@ class DBHelper {
         await db.execute('DROP TABLE IF EXISTS words');
         await _createDb(db);
       },
+      // ponytail: user tables live outside the versioned schema, so bumping
+      // the version (which drops & re-imports content) never wipes user data.
+      onOpen: (db) async {
+        await db.execute('''
+          CREATE TABLE IF NOT EXISTS bookmarks (
+            verse_id INTEGER PRIMARY KEY,
+            sura INTEGER,
+            aya INTEGER,
+            color INTEGER,
+            note TEXT,
+            created_at INTEGER
+          )
+        ''');
+      },
     );
     return _db!;
+  }
+
+  static Future<void> upsertBookmark(Bookmark b) async {
+    final db = await database;
+    await db.insert('bookmarks', b.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  static Future<void> deleteBookmark(int verseId) async {
+    final db = await database;
+    await db.delete('bookmarks', where: 'verse_id = ?', whereArgs: [verseId]);
+  }
+
+  static Future<List<Bookmark>> getBookmarks({int? sura}) async {
+    final db = await database;
+    final maps = await db.rawQuery('''
+      SELECT b.*, s.name AS suraName, v.text AS text
+      FROM bookmarks b
+      JOIN suras s ON s.number = b.sura
+      JOIN verses v ON v.id = b.verse_id
+      ${sura != null ? 'WHERE b.sura = ?' : ''}
+      ORDER BY b.created_at DESC
+    ''', sura != null ? [sura] : []);
+    return maps.map(Bookmark.fromMap).toList();
+  }
+
+  static Future<Verse?> getVerseById(int id) async {
+    final db = await database;
+    final maps = await db.rawQuery('''
+      SELECT verses.*, suras.name AS suraName
+      FROM verses JOIN suras ON verses.sura = suras.number
+      WHERE verses.id = ?
+    ''', [id]);
+    return maps.isEmpty ? null : Verse.fromJson(maps.first);
   }
 
   static Future<void> _createDb(Database db) async {

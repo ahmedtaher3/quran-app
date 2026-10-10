@@ -1,4 +1,5 @@
 import '../../../data/model/ayah.dart';
+import '../../../data/model/bookmark.dart';
 
 abstract class VerseState {}
 
@@ -11,12 +12,14 @@ class VerseLoaded extends VerseState {
   final int? lastViewedAyahId;
   final bool showContinueDialog;
   final int? playingAyahId; // <<< الجديد
+  final Map<int, Bookmark> bookmarks; // verseId -> bookmark
 
   VerseLoaded(
     this.verses, {
     this.lastViewedAyahId,
     this.showContinueDialog = false,
     this.playingAyahId,
+    this.bookmarks = const {},
   });
 }
 

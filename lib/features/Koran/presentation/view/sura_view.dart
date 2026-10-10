@@ -6,6 +6,7 @@ import 'package:untitled/features/Koran/presentation/manager/sura_cubit/sura_cub
 import 'package:untitled/features/Koran/presentation/manager/sura_cubit/sura_state.dart';
 import 'package:untitled/features/Koran/presentation/view/widgets/sura_view_deatils.dart';
 import 'package:untitled/search_view.dart';
+import 'package:untitled/features/Koran/presentation/view/bookmarks_view.dart';
 
 class SuraView extends StatelessWidget {
   @override
@@ -23,6 +24,20 @@ class SuraView extends StatelessWidget {
                   floating: false,
                   pinned: true,
                   backgroundColor: const Color(0xFF00695C),
+                  actions: [
+                    IconButton(
+                      tooltip: "العلامات",
+                      icon: const Icon(Icons.bookmarks_rounded,
+                          color: Colors.white),
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const BookmarksView()),
+                      ).then((_) => builderContext
+                          .read<SuraCubit>()
+                          .refreshLastRead()),
+                    ),
+                  ],
                   flexibleSpace: FlexibleSpaceBar(
                     centerTitle: true,
                     title: const Text(
@@ -183,6 +198,7 @@ class _LastReadWidget extends StatelessWidget {
         }
 
         final lastSuraNum = state.lastReadSura!;
+        final lastAya = state.lastReadAya;
         String suraName = "سورة رقم $lastSuraNum";
 
         try {
@@ -266,6 +282,12 @@ class _LastReadWidget extends StatelessWidget {
                                   
                                 ),
                               ),
+                              if (lastAya != null)
+                                Text(
+                                  "الآية $lastAya",
+                                  style: const TextStyle(
+                                      color: Colors.white70, fontSize: 14),
+                                ),
                             ],
                           ),
                         ),
@@ -280,6 +302,7 @@ class _LastReadWidget extends StatelessWidget {
                                   builder: (_) => VerseListView(
                                     suraNumber: lastSuraNum,
                                     SuraName: suraName,
+                                    ayaNumber: lastAya,
                                   ),
                                 ),
                               ).then((_) {
@@ -353,7 +376,9 @@ class SuraItemCard extends StatelessWidget {
               builder: (_) =>
                   VerseListView(suraNumber: sura.number, SuraName: sura.name),
             ),
-          ),
+          ).then((_) {
+            if (context.mounted) context.read<SuraCubit>().refreshLastRead();
+          }),
           borderRadius: BorderRadius.circular(20),
           child: Padding(
             padding: const EdgeInsets.all(16),

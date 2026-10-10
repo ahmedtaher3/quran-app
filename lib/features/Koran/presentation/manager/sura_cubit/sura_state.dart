@@ -9,7 +9,8 @@ class SuraLoading extends SuraState {}
 class SuraLoaded extends SuraState {
   final List<Sura> suras;
   final int? lastReadSura; // <<< الجديد
-  SuraLoaded(this.suras, {this.lastReadSura});
+  final int? lastReadAya;
+  SuraLoaded(this.suras, {this.lastReadSura, this.lastReadAya});
 }
 
 class SuraError extends SuraState {

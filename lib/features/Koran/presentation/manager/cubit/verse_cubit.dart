@@ -3,6 +3,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:untitled/AudioManager.dart';
 import 'package:untitled/features/Koran/presentation/manager/cubit/verse_state.dart';
 import 'package:untitled/core/constants/app_constants.dart';
+import 'package:untitled/features/Koran/data/data_sources/local/db_helper.dart';
+import 'package:untitled/features/Koran/data/model/ayah.dart';
+import 'package:untitled/features/Koran/data/model/bookmark.dart';
 import '../../../data/repo/quran_repository.dart';
 
 class VerseCubit extends Cubit<VerseState> {
@@ -12,19 +15,29 @@ class VerseCubit extends Cubit<VerseState> {
   int? currentSuraNumber; // <<< الجديد
   bool shouldShowContinueDialog = false;
 
+  Map<int, Bookmark> bookmarks = {};
+
   VerseCubit(this.repo) : super(VerseInitial());
 
-  Future<void> loadVerses(int suraNumber) async {
+  /// [skipContinueDialog]: opened at a specific ayah, so don't ask.
+  Future<void> loadVerses(int suraNumber,
+      {bool skipContinueDialog = false}) async {
     currentSuraNumber = suraNumber; // حفظ السورة الحالية
     try {
       emit(VerseLoading());
 
       final verses = await repo.getVersesBySura(suraNumber);
+      bookmarks = {
+        for (final b in await DBHelper.getBookmarks(sura: suraNumber))
+          b.verseId: b
+      };
 
       await loadLastViewedAyah(suraNumber, verses);
+      if (skipContinueDialog) shouldShowContinueDialog = false;
 
       emit(VerseLoaded(
         verses,
+        bookmarks: bookmarks,
         lastViewedAyahId: lastViewedAyahId,
         showContinueDialog: shouldShowContinueDialog,
       ));
@@ -62,6 +75,7 @@ class VerseCubit extends Cubit<VerseState> {
       final verses = (state as VerseLoaded).verses;
       emit(VerseLoaded(
         verses,
+        bookmarks: bookmarks,
         lastViewedAyahId: null,
         showContinueDialog: false,
       ));
@@ -75,6 +89,7 @@ class VerseCubit extends Cubit<VerseState> {
 
       emit(VerseLoaded(
         verses,
+        bookmarks: bookmarks,
         lastViewedAyahId: lastViewedAyahId,
         showContinueDialog: false,
       ));
@@ -97,6 +112,7 @@ class VerseCubit extends Cubit<VerseState> {
       final verses = (state as VerseLoaded).verses;
       emit(VerseLoaded(
         verses,
+        bookmarks: bookmarks,
         lastViewedAyahId: ayahId,
         showContinueDialog: false,
       ));
@@ -150,6 +166,7 @@ class VerseCubit extends Cubit<VerseState> {
       // تحديث الحالة لتمييز الآية الحالية
       emit(VerseLoaded(
         verses,
+        bookmarks: bookmarks,
         lastViewedAyahId: verse.id,
         showContinueDialog: false,
         playingAyahId: verse.id,
@@ -170,9 +187,43 @@ class VerseCubit extends Cubit<VerseState> {
       AudioManager.stop();
       emit(VerseLoaded(
         verses,
+        bookmarks: bookmarks,
         lastViewedAyahId: lastViewedAyahId,
         showContinueDialog: false,
         playingAyahId: null,
+      ));
+    }
+  }
+
+  Future<void> saveBookmark(Verse verse, int color, String? note) async {
+    final b = Bookmark(
+      verseId: verse.id,
+      sura: verse.sura,
+      aya: verse.ayaNumber ?? 0,
+      color: color,
+      note: (note == null || note.trim().isEmpty) ? null : note.trim(),
+      createdAt: bookmarks[verse.id]?.createdAt ??
+          DateTime.now().millisecondsSinceEpoch,
+    );
+    await DBHelper.upsertBookmark(b);
+    bookmarks = {...bookmarks, verse.id: b};
+    _reemit();
+  }
+
+  Future<void> removeBookmark(int verseId) async {
+    await DBHelper.deleteBookmark(verseId);
+    bookmarks = Map.of(bookmarks)..remove(verseId);
+    _reemit();
+  }
+
+  void _reemit() {
+    final s = state;
+    if (s is VerseLoaded) {
+      emit(VerseLoaded(
+        s.verses,
+        bookmarks: bookmarks,
+        lastViewedAyahId: s.lastViewedAyahId,
+        playingAyahId: s.playingAyahId,
       ));
     }
   }

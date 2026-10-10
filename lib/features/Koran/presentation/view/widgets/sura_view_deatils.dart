@@ -191,7 +191,8 @@ class _VerseListViewState extends State<VerseListView> {
   Widget build(BuildContext context) {
     return BlocProvider(
       create: (_) =>
-          VerseCubit(QuranRepository())..loadVerses(widget.suraNumber),
+          VerseCubit(QuranRepository())..loadVerses(widget.suraNumber,
+              skipContinueDialog: widget.ayaNumber != null),
       child: BlocBuilder<VerseCubit, VerseState>(
         builder: (context, state) {
           return PopScope(
@@ -379,6 +380,7 @@ class _VerseListViewState extends State<VerseListView> {
                                       return VerseCard(
                                         key: _verseKeyFor(verse.id),
                                         verse: verse,
+                                        bookmark: state.bookmarks[verse.id],
                                         highlight: verse.id ==
                                                 _flashHighlightVerseId ||
                                             verse.id ==
