@@ -68,6 +68,18 @@ class DBHelper {
     return maps.map(Bookmark.fromMap).toList();
   }
 
+  /// First (or last) verse on a mushaf page, with its sura name.
+  static Future<Verse?> getPageEdge(int page, {bool last = false}) async {
+    final db = await database;
+    final maps = await db.rawQuery('''
+      SELECT verses.*, suras.name AS suraName
+      FROM verses JOIN suras ON verses.sura = suras.number
+      WHERE verses.page = ?
+      ORDER BY verses.id ${last ? 'DESC' : 'ASC'} LIMIT 1
+    ''', [page]);
+    return maps.isEmpty ? null : Verse.fromJson(maps.first);
+  }
+
   static Future<Verse?> getVerseById(int id) async {
     final db = await database;
     final maps = await db.rawQuery('''

@@ -6,6 +6,8 @@ import 'package:untitled/features/Koran/presentation/manager/sura_cubit/sura_cub
 import 'package:untitled/features/Koran/presentation/manager/sura_cubit/sura_state.dart';
 import 'package:untitled/features/Koran/presentation/view/widgets/sura_view_deatils.dart';
 import 'package:untitled/search_view.dart';
+import 'package:untitled/features/khatma/khatma.dart';
+import 'package:untitled/features/khatma/khatma_view.dart';
 import 'package:untitled/features/Koran/presentation/view/bookmarks_view.dart';
 
 class SuraView extends StatelessWidget {
@@ -123,6 +125,8 @@ class SuraView extends StatelessWidget {
                         ),
                         const SizedBox(height: 16),
                         const _LastReadWidget(),
+                        const SizedBox(height: 12),
+                        const _KhatmaCard(),
                         const SizedBox(height: 10),
                       ],
                     ),
@@ -329,6 +333,106 @@ class _LastReadWidget extends StatelessWidget {
                     ),
                   ),
                 ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _KhatmaCard extends StatefulWidget {
+  const _KhatmaCard();
+
+  @override
+  State<_KhatmaCard> createState() => _KhatmaCardState();
+}
+
+class _KhatmaCardState extends State<_KhatmaCard> {
+  late Future<Khatma?> _k = KhatmaStore.load();
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<Khatma?>(
+      future: _k,
+      builder: (context, snap) {
+        if (snap.connectionState != ConnectionState.done) {
+          return const SizedBox(height: 72);
+        }
+        final k = snap.data;
+        final title = k == null
+            ? "ابدأ ختمة جديدة"
+            : k.doneToday(DateTime.now())
+                ? "أنهيت ورد اليوم ✓"
+                : "ورد اليوم";
+        final subtitle = k == null
+            ? "قسّم المصحف على أيام مع تذكير يومي"
+            : "صفحة ${k.wirdStart} - ${k.wirdEnd} • ${(k.progress * 100).toStringAsFixed(0)}% من الختمة";
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Material(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(20),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const KhatmaView()),
+              ).then((_) {
+                if (!mounted) return;
+                setState(() => _k = KhatmaStore.load());
+                context.read<SuraCubit>().refreshLastRead();
+              }),
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.amber.shade200),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.shade50,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(Icons.track_changes_rounded,
+                          color: Colors.amber.shade800),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(title,
+                              style: const TextStyle(
+                                  fontSize: 17, fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 2),
+                          Text(subtitle,
+                              style: TextStyle(
+                                  fontSize: 13, color: Colors.grey.shade600)),
+                        ],
+                      ),
+                    ),
+                    if (k != null)
+                      SizedBox(
+                        width: 36,
+                        height: 36,
+                        child: CircularProgressIndicator(
+                          value: k.progress,
+                          strokeWidth: 4,
+                          backgroundColor: Colors.amber.shade50,
+                          valueColor: AlwaysStoppedAnimation(
+                              Colors.amber.shade700),
+                        ),
+                      )
+                    else
+                      Icon(Icons.arrow_forward_ios_rounded,
+                          size: 16, color: Colors.grey.shade300),
+                  ],
+                ),
               ),
             ),
           ),
