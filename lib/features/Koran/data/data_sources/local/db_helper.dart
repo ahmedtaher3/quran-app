@@ -153,6 +153,23 @@ class DBHelper {
     return maps.isEmpty ? null : Verse.fromJson(maps.first);
   }
 
+  /// Verses with sura names: given suras, memorized ones, or everything.
+  static Future<List<Verse>> getVersesWithNames(
+      {List<int>? suras, bool memorizedOnly = false}) async {
+    final db = await database;
+    final where = memorizedOnly
+        ? 'WHERE v.id IN (SELECT verse_id FROM hifz_cards)'
+        : suras != null
+            ? 'WHERE v.sura IN (${List.filled(suras.length, '?').join(',')})'
+            : '';
+    final maps = await db.rawQuery('''
+      SELECT v.*, s.name AS suraName
+      FROM verses v JOIN suras s ON v.sura = s.number
+      $where ORDER BY v.id
+    ''', memorizedOnly ? [] : suras ?? []);
+    return maps.map(Verse.fromJson).toList();
+  }
+
   static Future<Verse?> getVerseById(int id) async {
     final db = await database;
     final maps = await db.rawQuery('''
