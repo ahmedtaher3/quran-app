@@ -104,9 +104,17 @@ class QuranPlayer {
     return out.stream;
   }
 
+  /// Queue index [play] is loading. Until the load finishes,
+  /// player.currentIndex still points into the previous source (often a word
+  /// clip at 0), which would report the sura's first ayah as playing.
+  int? _starting;
+
   Verse? get current {
+    if (_queue.isEmpty) return null;
+    final s = _starting;
+    if (s != null) return _queue[s.clamp(0, _queue.length - 1)];
     final i = player.currentIndex;
-    if (i == null || _queue.isEmpty) return null;
+    if (i == null) return null;
     return _queue[(i ~/ _repeatEach).clamp(0, _queue.length - 1)];
   }
 
@@ -245,22 +253,47 @@ class QuranPlayer {
             ),
           ),
     ];
-    await player.setLoopMode(loopRange ? LoopMode.all : LoopMode.off);
-    await player.setSpeed(speed);
-    await player.setAudioSources(sources, initialIndex: start * _repeatEach);
-    player.play();
+    final load = ++_loads;
+    _starting = start;
+    try {
+      // Drop whatever is still loading first (usually a word clip): if its
+      // server is unreachable, its error would otherwise land on this load
+      // and the recitation would never start.
+      await player.stop();
+      await player.setAudioSources(sources, initialIndex: start * _repeatEach);
+      await player.setLoopMode(loopRange ? LoopMode.all : LoopMode.off);
+      await player.setSpeed(speed);
+    } catch (e) {
+      // offline: leave the player idle. If a newer play/clip replaced this
+      // load, the queue is theirs now.
+      if (load == _loads) _queue = [];
+      return;
+    } finally {
+      if (load == _loads) _starting = null;
+    }
+    if (load == _loads) player.play(); // not stopped or replaced meanwhile
   }
+
+  int _loads = 0; // bumped by every play/clip so a stale load can tell
 
   /// One-off clip (word pronunciation); replaces any queue.
   Future<void> playClip(String url, {String title = ''}) async {
+    final load = ++_loads;
+    _starting = null;
     _queue = [];
-    await player.setLoopMode(LoopMode.off);
-    await player.setAudioSource(AudioSource.uri(Uri.parse(url),
-        tag: MediaItem(id: url, title: title)));
-    player.play();
+    try {
+      await player.setAudioSource(AudioSource.uri(Uri.parse(url),
+          tag: MediaItem(id: url, title: title)));
+      await player.setLoopMode(LoopMode.off);
+    } catch (_) {
+      return; // word audio unreachable, or interrupted by another play
+    }
+    if (load == _loads) player.play();
   }
 
   Future<void> stop() async {
+    _loads++;
+    _starting = null;
     _queue = [];
     await player.stop();
   }
