@@ -64,6 +64,14 @@ class VerseTiming {
   }
 }
 
+/// A play that failed (offline, server down), for the screen to show with a
+/// retry button.
+class PlayerFailure {
+  final String message;
+  final Future<void> Function() retry;
+  const PlayerFailure(this.message, this.retry);
+}
+
 /// The app's only audio player (just_audio_background allows one).
 /// A queue is a list of verses; "repeat each ayah N times" is done by
 /// putting each verse N times in the playlist, "repeat range" by LoopMode.all.
@@ -72,6 +80,21 @@ class QuranPlayer {
   static final instance = QuranPlayer._();
 
   final player = AudioPlayer();
+
+  final _failures = StreamController<PlayerFailure>.broadcast();
+  DateTime _lastFailure = DateTime(0);
+
+  /// Failed plays. A load error can surface both from the load call and on
+  /// the player's event stream, so repeats within 2s are dropped.
+  Stream<PlayerFailure> get failures => _failures.stream;
+
+  void _fail(String message, Future<void> Function() retry) {
+    final now = DateTime.now();
+    if (now.difference(_lastFailure) < const Duration(seconds: 2)) return;
+    _lastFailure = now;
+    _failures.add(PlayerFailure(message, retry));
+  }
+
   List<Verse> _queue = [];
   String? _suraName;
   int _repeatEach = 1;
@@ -264,9 +287,13 @@ class QuranPlayer {
       await player.setLoopMode(loopRange ? LoopMode.all : LoopMode.off);
       await player.setSpeed(speed);
     } catch (e) {
-      // offline: leave the player idle. If a newer play/clip replaced this
-      // load, the queue is theirs now.
-      if (load == _loads) _queue = [];
+      // offline: leave the player idle. If a newer play/clip/stop replaced
+      // this load, the queue is theirs now and there is nothing to report.
+      if (load == _loads) {
+        _queue = [];
+        _fail("تعذّر تشغيل التلاوة. تأكد من الاتصال بالإنترنت أو حمّل السورة.",
+            () => play(verses, start: start, suraName: suraName));
+      }
       return;
     } finally {
       if (load == _loads) _starting = null;
@@ -286,7 +313,12 @@ class QuranPlayer {
           tag: MediaItem(id: url, title: title)));
       await player.setLoopMode(LoopMode.off);
     } catch (_) {
-      return; // word audio unreachable, or interrupted by another play
+      // word audio unreachable; stay quiet if another play replaced it
+      if (load == _loads) {
+        _fail("تعذّر تشغيل صوت الكلمة. تأكد من الاتصال بالإنترنت.",
+            () => playClip(url, title: title));
+      }
+      return;
     }
     if (load == _loads) player.play();
   }
@@ -345,8 +377,17 @@ class QuranPlayer {
     await play(_queue, start: _queue.indexOf(cur), suraName: _suraName);
   }
 
-  /// Log played verses for stats. Call once at startup.
+  /// Log played verses for stats, and report ayahs that fail to load
+  /// mid-queue. Call once at startup.
   void startLogging() {
+    player.playbackEventStream.listen((_) {}, onError: (Object e, _) {
+      // during play() the load error is reported there
+      if (_starting != null || _queue.isEmpty) return;
+      final q = _queue, name = _suraName, at = current;
+      final i = at == null ? 0 : q.indexOf(at);
+      _fail("تعذّر تحميل الآية. تأكد من الاتصال بالإنترنت أو حمّل السورة.",
+          () => play(q, start: i < 0 ? 0 : i, suraName: name));
+    });
     currentVerse.listen((v) {
       if (v != null) DBHelper.logVerses([v.id]);
     });

@@ -1,6 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:untitled/core/app_theme.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
+import 'package:untitled/features/audio/quran_player.dart';
 import 'package:untitled/features/Koran/data/data_sources/local/db_helper.dart';
 import 'package:untitled/features/Koran/data/repo/quran_repository.dart';
 import 'package:untitled/features/Koran/presentation/manager/cubit/verse_cubit.dart';
@@ -9,7 +13,6 @@ import 'package:untitled/features/Koran/presentation/view/widgets/verse_card.dar
 import 'package:untitled/features/Koran/presentation/view/widgets/reader_controls.dart';
 import 'package:untitled/features/audio/downloads_view.dart';
 import 'package:untitled/features/Koran/presentation/view/flow_sura_view.dart';
-import 'package:untitled/core/app_theme.dart';
 
 class VerseListView extends StatefulWidget {
   final int suraNumber;
@@ -169,8 +172,31 @@ class _VerseListViewState extends State<VerseListView> {
     });
   }
 
+  StreamSubscription<PlayerFailure>? _failures;
+
+  @override
+  void initState() {
+    super.initState();
+    // keep the screen on while reading or listening, in both modes
+    WakelockPlus.enable();
+    _failures = QuranPlayer.instance.failures.listen(_showFailure);
+  }
+
+  void _showFailure(PlayerFailure f) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        content: Text(f.message),
+        duration: const Duration(seconds: 6),
+        action: SnackBarAction(label: "إعادة المحاولة", onPressed: f.retry),
+      ));
+  }
+
   @override
   void dispose() {
+    _failures?.cancel();
+    WakelockPlus.disable();
     _scrollController.dispose();
     super.dispose();
   }
