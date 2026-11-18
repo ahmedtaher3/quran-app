@@ -54,6 +54,7 @@ dependencies:
   flutter_compass: ^0.8.1
   share_plus: ^13.3.1
   workmanager: ^0.10.10
+  hijri: ^3.0.1
 
 dev_dependencies:
   flutter_test:
