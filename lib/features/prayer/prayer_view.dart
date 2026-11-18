@@ -16,7 +16,11 @@ const _teal = Color(0xFF00695C);
 class PrayerView extends StatefulWidget {
   const PrayerView({super.key});
 
-  static const routeName = '/prayer';
+  /// The route of the prayer screen currently in the stack, however it was
+  /// opened, so a notification tap brings it forward instead of stacking a
+  /// second one.
+  static Route<dynamic>? get openRoute => _openRoute;
+  static Route<dynamic>? _openRoute;
 
   @override
   State<PrayerView> createState() => _PrayerViewState();
@@ -37,8 +41,18 @@ class _PrayerViewState extends State<PrayerView> with WidgetsBindingObserver {
     _init();
   }
 
+  Route<dynamic>? _route;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _route = ModalRoute.of(context);
+    PrayerView._openRoute = _route;
+  }
+
   @override
   void dispose() {
+    if (PrayerView._openRoute == _route) PrayerView._openRoute = null;
     WidgetsBinding.instance.removeObserver(this);
     _clock?.dispose();
     super.dispose();
@@ -386,8 +400,9 @@ class _QiblaTab extends StatelessWidget {
               ),
             if (hasCompass && declination != 0)
               Text(
+                // LTR isolate keeps "+5.1°" from flipping inside RTL text
                 "مُصحَّح بالانحراف المغناطيسي "
-                "(${declination >= 0 ? '+' : ''}${declination.toStringAsFixed(1)}°)",
+                "(\u2066${declination >= 0 ? '+' : ''}${declination.toStringAsFixed(1)}°\u2069)",
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
               ),

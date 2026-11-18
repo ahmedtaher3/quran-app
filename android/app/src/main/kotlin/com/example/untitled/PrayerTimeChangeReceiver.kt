@@ -26,7 +26,11 @@ class PrayerTimeChangeReceiver : BroadcastReceiver() {
         val work = OneTimeWorkRequestBuilder<BackgroundWorker>()
             .setInputData(workDataOf(BackgroundWorker.DART_TASK_KEY to "prayer_reschedule"))
             .build()
-        WorkManager.getInstance(context)
-            .enqueueUniqueWork("prayer_reschedule_now", ExistingWorkPolicy.REPLACE, work)
+        // Several of these broadcasts often arrive together (an update also
+        // re-sends the exact-alarm state). REPLACE would cancel a run that is
+        // already replanning; append a fresh run after it instead.
+        WorkManager.getInstance(context).enqueueUniqueWork(
+            "prayer_reschedule_now", ExistingWorkPolicy.APPEND_OR_REPLACE, work
+        )
     }
 }

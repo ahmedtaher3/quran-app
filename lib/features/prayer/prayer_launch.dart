@@ -34,16 +34,13 @@ class PrayerLaunch {
   }
 
   static void _push(NavigatorState nav) {
-    // a second tap must not stack another prayer screen on the first
-    var onTop = false;
-    nav.popUntil((r) {
-      onTop = r.settings.name == PrayerView.routeName;
-      return true;
-    });
-    if (onTop) return;
-    nav.push(MaterialPageRoute(
-      settings: const RouteSettings(name: PrayerView.routeName),
-      builder: (_) => const PrayerView(),
-    ));
+    // already open (from the home tile or an earlier tap): bring it forward,
+    // closing a sheet or dialog above it, instead of stacking a second one
+    final open = PrayerView.openRoute;
+    if (open != null && open.isActive) {
+      nav.popUntil((r) => r == open);
+      return;
+    }
+    nav.push(MaterialPageRoute(builder: (_) => const PrayerView()));
   }
 }
