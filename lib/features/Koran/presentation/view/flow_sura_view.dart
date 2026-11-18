@@ -14,7 +14,6 @@ import 'package:untitled/features/Koran/data/model/bookmark.dart';
 import 'package:untitled/features/Koran/presentation/manager/cubit/verse_cubit.dart';
 import 'package:untitled/features/Koran/presentation/manager/cubit/verse_state.dart';
 import 'package:untitled/features/Koran/presentation/view/widgets/reader_controls.dart';
-import 'package:untitled/features/audio/downloads_view.dart';
 import 'package:untitled/features/audio/quran_player.dart';
 import 'package:untitled/features/share/share_ayah.dart';
 import 'package:untitled/features/tafsir/tafsir_sheet.dart';
@@ -65,14 +64,12 @@ class FlowSuraView extends StatefulWidget {
   final int sura;
   final String suraName;
   final int? ayaNumber; // open at this ayah (search, bookmarks, continue)
-  final Widget? modeToggle;
   final Widget? footer; // previous / next sura
   const FlowSuraView(
       {super.key,
       required this.sura,
       required this.suraName,
       this.ayaNumber,
-      this.modeToggle,
       this.footer});
 
   @override
@@ -156,11 +153,6 @@ class _FlowSuraViewState extends State<FlowSuraView> {
         DBHelper.logVerses(_onScreenAyahs(view).map((a) => a.id));
       }
     });
-  }
-
-  void _zoom(double d) {
-    final s = AppSettings.instance;
-    s.update(quranSize: (s.quranSize + d).clamp(18, 44).toDouble());
   }
 
   // ---- geometry ----------------------------------------------------------
@@ -431,33 +423,8 @@ class _FlowSuraViewState extends State<FlowSuraView> {
             if (ok && context.mounted) Navigator.of(context).pop();
           },
           child: Scaffold(
-            appBar: AppBar(
-              backgroundColor: _teal,
-              iconTheme: const IconThemeData(color: Colors.white),
-              // shrink long names to fit beside the action buttons
-              title: FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(widget.suraName,
-                    style: const TextStyle(color: Colors.white)),
-              ),
-              centerTitle: true,
-              actions: [
-                IconButton(
-                  tooltip: "تصغير الخط",
-                  icon: const Icon(Icons.text_decrease_rounded,
-                      color: Colors.white),
-                  onPressed: () => _zoom(-2),
-                ),
-                IconButton(
-                  tooltip: "تكبير الخط",
-                  icon: const Icon(Icons.text_increase_rounded,
-                      color: Colors.white),
-                  onPressed: () => _zoom(2),
-                ),
-                if (widget.modeToggle != null) widget.modeToggle!,
-                SuraDownloadButton(sura: widget.sura),
-              ],
-            ),
+            appBar:
+                readerAppBar(sura: widget.sura, suraName: widget.suraName),
             body: pages == null
                 ? const Center(child: CircularProgressIndicator())
                 : NotificationListener<ScrollNotification>(
@@ -679,8 +646,12 @@ class _PageParagraphState extends State<_PageParagraph> {
       if (i == 0 || words[i - 1].ayahId != w.ayahId) {
         start = offset;
         if (widget.quarterStarts.contains(w.ayahId) && w.quarter > 0) {
-          add(TextSpan(text: '۞ ', style: marker), 2);
-          final label = '${quarterLabel(w.quarter)} ';
+          // no-break spaces keep ۞, its label and the ayah's first word on
+          // one line
+          const nbsp = '\u00A0';
+          add(TextSpan(text: '۞$nbsp', style: marker), 2);
+          final label =
+              '${quarterLabel(w.quarter).replaceAll(' ', nbsp)}$nbsp';
           add(
               TextSpan(
                   text: label,

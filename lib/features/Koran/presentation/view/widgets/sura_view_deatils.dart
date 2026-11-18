@@ -12,7 +12,6 @@ import 'package:untitled/features/Koran/presentation/manager/cubit/verse_cubit.d
 import 'package:untitled/features/Koran/presentation/manager/cubit/verse_state.dart';
 import 'package:untitled/features/Koran/presentation/view/widgets/verse_card.dart';
 import 'package:untitled/features/Koran/presentation/view/widgets/reader_controls.dart';
-import 'package:untitled/features/audio/downloads_view.dart';
 import 'package:untitled/features/Koran/presentation/view/flow_sura_view.dart';
 
 class VerseListView extends StatefulWidget {
@@ -215,40 +214,67 @@ class _VerseListViewState extends State<VerseListView> {
   void dispose() {
     _failures?.cancel();
     WakelockPlus.disable();
+    _cubit.close(); // playback itself carries on in the background
     _scrollController.dispose();
     super.dispose();
   }
 
-  Widget _modeToggle() {
-    final flow = AppSettings.instance.flowReading;
-    return IconButton(
-      tooltip: flow ? "عرض الآيات كبطاقات" : "عرض متصل كالمصحف",
-      icon: Icon(flow ? Icons.view_agenda_rounded : Icons.subject_rounded,
-          color: Colors.white),
-      onPressed: () => AppSettings.instance.update(flowReading: !flow),
-    );
+  // One cubit for both modes: switching keeps playback, bookmarks and the
+  // reading position.
+  late final _cubit = VerseCubit(QuranRepository())
+    ..suraName = widget.SuraName
+    ..loadVerses(widget.suraNumber,
+        skipContinueDialog: widget.ayaNumber != null);
+
+  bool? _wasFlow;
+
+  /// Ayah number of the saved reading spot, to reopen there after the
+  /// reader switches mode.
+  int? _spotAya() {
+    final s = _cubit.state;
+    if (s is! VerseLoaded) return null;
+    return s.verses
+        .where((v) => v.id == _cubit.lastViewedAyahId)
+        .firstOrNull
+        ?.ayaNumber;
   }
 
   @override
   Widget build(BuildContext context) {
-    // One cubit for both modes: switching keeps playback, bookmarks and the
-    // reading position.
-    return BlocProvider(
-      create: (_) =>
-          VerseCubit(QuranRepository())
-            ..suraName = widget.SuraName
-            ..loadVerses(widget.suraNumber,
-              skipContinueDialog: widget.ayaNumber != null),
-      child: AppSettings.instance.flowReading
+    final flow = AppSettings.instance.flowReading;
+    final switched = _wasFlow != null && _wasFlow != flow;
+    _wasFlow = flow;
+    if (switched && !flow) {
+      // resume at the spot, not the ayah the screen was first opened at
+      _hasScrolledToInitialAyah = true;
+      _resumeCardsAtSpot();
+    }
+    return BlocProvider.value(
+      value: _cubit,
+      child: flow
           ? FlowSuraView(
               sura: widget.suraNumber,
               suraName: widget.SuraName,
-              ayaNumber: widget.ayaNumber,
-              modeToggle: _modeToggle(),
+              // only read when the flow view is created, i.e. on a switch
+              ayaNumber: (switched ? _spotAya() : null) ?? widget.ayaNumber,
               footer: _footer(),
             )
           : _cards(),
     );
+  }
+
+  /// Switched from the flow view: open the cards where the reader was.
+  void _resumeCardsAtSpot() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final s = _cubit.state;
+      final id = _cubit.lastViewedAyahId;
+      if (!mounted || s is! VerseLoaded || id == null) return;
+      final index = s.verses.indexWhere((v) => v.id == id);
+      if (index == -1) return;
+      _scrollToVerse(
+          verseId: id, index: index, itemCount: s.verses.length);
+      _flashHighlight(id);
+    });
   }
 
   Widget _cards() {
@@ -265,13 +291,10 @@ class _VerseListViewState extends State<VerseListView> {
             },
             child: Scaffold(
               backgroundColor: AppColors.bg,
+              appBar: readerAppBar(
+                  sura: widget.suraNumber, suraName: widget.SuraName),
               body: Builder(
                 builder: (innerContext) {
-                  String suraTitle = "آيات السورة";
-                  if (state is VerseLoaded && state.verses.isNotEmpty) {
-                    suraTitle = widget.SuraName?.toString() ?? "سورة القران";
-                  }
-
                   return NotificationListener<ScrollEndNotification>(
                     onNotification: (_) {
                       if (state is VerseLoaded) {
@@ -289,64 +312,6 @@ class _VerseListViewState extends State<VerseListView> {
                     child: CustomScrollView(
                       controller: _scrollController,
                       slivers: [
-                        SliverAppBar(
-                          expandedHeight: 200.0,
-                          floating: false,
-                          pinned: true,
-                          leading: const BackButton(color: Colors.white),
-                          actions: [
-                            _modeToggle(),
-                            SuraDownloadButton(sura: widget.suraNumber),
-                          ],
-                          backgroundColor: const Color(0xFF00695C),
-                          flexibleSpace: FlexibleSpaceBar(
-                            centerTitle: true,
-                            title: Text(
-                              suraTitle,
-                              style: const TextStyle(
-                                
-                                fontWeight: FontWeight.bold,
-                                fontSize: 20,
-                                color: Colors.white,
-                              ),
-                            ),
-                            background: Container(
-                              decoration: const BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [
-                                    Color(0xFF004D40),
-                                    Color(0xFF00796B)
-                                  ],
-                                  begin: Alignment.topRight,
-                                  end: Alignment.bottomLeft,
-                                ),
-                              ),
-                              child: Stack(
-                                children: [
-                                  Positioned(
-                                    bottom: -20,
-                                    left: -20,
-                                    child: Icon(
-                                      Icons.mosque,
-                                      size: 180,
-                                      color: Colors.white.withOpacity(0.05),
-                                    ),
-                                  ),
-                                  Center(
-                                    child: Column(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        const SizedBox(height: 20),
-                                        const SizedBox(height: 20),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
                         SliverToBoxAdapter(
                           child: BlocListener<VerseCubit, VerseState>(
                             listener: (context, state) {

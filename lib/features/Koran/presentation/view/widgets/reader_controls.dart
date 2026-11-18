@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:untitled/core/app_theme.dart';
+import 'package:untitled/features/audio/audio_downloads.dart';
 import 'package:untitled/features/Koran/data/data_sources/local/db_helper.dart';
 import 'package:untitled/features/Koran/data/model/ayah.dart';
 import 'package:untitled/features/Koran/data/model/sura.dart';
@@ -382,6 +384,222 @@ class _SuraNavButton extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+const _teal = Color(0xFF00695C);
+
+/// The reader's header, the same in both modes: back, the sura's name, and
+/// a ⋮ menu holding everything else.
+PreferredSizeWidget readerAppBar({required int sura, required String suraName}) {
+  return AppBar(
+    backgroundColor: _teal,
+    iconTheme: const IconThemeData(color: Colors.white),
+    centerTitle: true,
+    // shrink long names rather than cut them
+    title: FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Text(suraName, style: const TextStyle(color: Colors.white)),
+    ),
+    actions: [ReaderMenu(sura: sura)],
+  );
+}
+
+enum _MenuItem { fontSize, mode, download, recitation }
+
+/// ⋮ menu: font size, reading mode, offline download, recitation settings.
+/// A running download also shows as a ring beside it, tap to cancel.
+class ReaderMenu extends StatefulWidget {
+  final int sura;
+  const ReaderMenu({super.key, required this.sura});
+
+  @override
+  State<ReaderMenu> createState() => _ReaderMenuState();
+}
+
+class _ReaderMenuState extends State<ReaderMenu> {
+  final _dl = AudioDownloads.instance;
+  bool _complete = false; // every ayah downloaded for the current reciter
+
+  @override
+  void initState() {
+    super.initState();
+    _check();
+  }
+
+  Future<void> _check() async {
+    final total = (await DBHelper.getVersesBySura(widget.sura)).length;
+    final done = await _dl.downloadedCount(
+        QuranPlayer.instance.reciterId, widget.sura);
+    if (mounted) setState(() => _complete = done >= total);
+  }
+
+  Future<void> _download() async {
+    try {
+      await _dl.downloadSura(widget.sura);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text("تعذّر التحميل، تحقق من الإنترنت")));
+      }
+    }
+    _check();
+  }
+
+  void _onSelected(_MenuItem item) {
+    switch (item) {
+      case _MenuItem.fontSize:
+        showFontSizeSheet(context);
+      case _MenuItem.mode:
+        final s = AppSettings.instance;
+        s.update(flowReading: !s.flowReading);
+      case _MenuItem.download:
+        if (_dl.progress.value.containsKey(widget.sura)) {
+          _dl.cancel(widget.sura);
+        } else {
+          _download();
+        }
+      case _MenuItem.recitation:
+        // the reciter may change, and downloads are per reciter
+        showPlayerSheet(context, settingsOnly: true).then((_) => _check());
+    }
+  }
+
+  PopupMenuItem<_MenuItem> _item(_MenuItem value, IconData icon, String label,
+          {bool enabled = true}) =>
+      PopupMenuItem(
+        value: value,
+        enabled: enabled,
+        child: Row(
+          children: [
+            Icon(icon, color: enabled ? _teal : Colors.grey),
+            const SizedBox(width: 12),
+            Text(label),
+          ],
+        ),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<Map<int, double>>(
+      valueListenable: _dl.progress,
+      builder: (context, progress, _) {
+        final p = progress[widget.sura];
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (p != null)
+              IconButton(
+                tooltip: "إلغاء التحميل",
+                onPressed: () => _dl.cancel(widget.sura),
+                icon: SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(
+                      value: p, strokeWidth: 2.5, color: Colors.white),
+                ),
+              ),
+            PopupMenuButton<_MenuItem>(
+              tooltip: "المزيد",
+              icon: const Icon(Icons.more_vert_rounded, color: Colors.white),
+              onSelected: _onSelected,
+              itemBuilder: (_) {
+                final flow = AppSettings.instance.flowReading;
+                return [
+                  _item(_MenuItem.fontSize, Icons.format_size_rounded,
+                      "حجم الخط"),
+                  _item(
+                      _MenuItem.mode,
+                      flow ? Icons.view_agenda_rounded : Icons.subject_rounded,
+                      flow ? "عرض الآيات كبطاقات" : "عرض متصل كالمصحف"),
+                  if (p != null)
+                    _item(_MenuItem.download, Icons.close_rounded,
+                        "إلغاء التحميل (${arNum((p * 100).round())}٪)")
+                  else if (_complete)
+                    _item(_MenuItem.download, Icons.offline_pin_rounded,
+                        "السورة محمّلة", enabled: false)
+                  else
+                    _item(_MenuItem.download, Icons.download_rounded,
+                        "تحميل السورة"),
+                  _item(_MenuItem.recitation, Icons.tune_rounded,
+                      "إعدادات التلاوة"),
+                ];
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// Font size with a live preview, so it can be tuned without reopening the
+/// menu for every step. Applies to both reading modes.
+void showFontSizeSheet(BuildContext context) {
+  showModalBottomSheet(
+    context: context,
+    useSafeArea: true,
+    builder: (_) => const _FontSizeSheet(),
+  );
+}
+
+class _FontSizeSheet extends StatelessWidget {
+  const _FontSizeSheet();
+
+  static const _min = 18.0, _max = 44.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = AppSettings.instance;
+    return ListenableBuilder(
+      listenable: s,
+      builder: (context, _) {
+        final size = s.quranSize.clamp(_min, _max).toDouble();
+        void set(double v) => s.update(quranSize: v.clamp(_min, _max));
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text("حجم الخط",
+                  style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.heading)),
+              const SizedBox(height: 16),
+              Text('بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ',
+                  textAlign: TextAlign.center,
+                  style: s.quranStyle(color: AppColors.heading)),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  IconButton.filledTonal(
+                    tooltip: "تصغير الخط",
+                    icon: const Icon(Icons.text_decrease_rounded),
+                    onPressed: size <= _min ? null : () => set(size - 2),
+                  ),
+                  Expanded(
+                    child: Slider(
+                      min: _min,
+                      max: _max,
+                      divisions: 13,
+                      value: size,
+                      label: arNum(size.round()),
+                      onChanged: set,
+                    ),
+                  ),
+                  IconButton.filledTonal(
+                    tooltip: "تكبير الخط",
+                    icon: const Icon(Icons.text_increase_rounded),
+                    onPressed: size >= _max ? null : () => set(size + 2),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
