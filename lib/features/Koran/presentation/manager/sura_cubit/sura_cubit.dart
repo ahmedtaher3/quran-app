@@ -1,6 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:untitled/features/Koran/data/data_sources/local/db_helper.dart';
+import 'package:untitled/features/Koran/presentation/manager/cubit/verse_cubit.dart';
 import '../../../data/repo/quran_repository.dart';
 import '../../../data/model/sura.dart';
 import 'sura_state.dart';
@@ -10,7 +11,17 @@ class SuraCubit extends Cubit<SuraState> {
 
   List<Sura> allSuras = [];
 
-  SuraCubit(this.repo) : super(SuraInitial());
+  SuraCubit(this.repo) : super(SuraInitial()) {
+    VerseCubit.positionSaved.addListener(_onPositionSaved);
+  }
+
+  void _onPositionSaved() => refreshLastRead();
+
+  @override
+  Future<void> close() {
+    VerseCubit.positionSaved.removeListener(_onPositionSaved);
+    return super.close();
+  }
 
   Future<void> loadSuras() async {
     try {
@@ -32,6 +43,7 @@ class SuraCubit extends Cubit<SuraState> {
     final lastAyahId = prefs.getInt("global_last_ayah_id");
     final verse =
         lastAyahId == null ? null : await DBHelper.getVerseById(lastAyahId);
+    if (isClosed) return;
     emit(SuraLoaded(allSuras,
         lastReadSura: lastSura,
         lastReadAya: verse?.ayaNumber,

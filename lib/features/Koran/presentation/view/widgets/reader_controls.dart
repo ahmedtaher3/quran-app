@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:untitled/features/Koran/data/data_sources/local/db_helper.dart';
 import 'package:untitled/features/Koran/data/model/ayah.dart';
+import 'package:untitled/features/Koran/data/model/sura.dart';
 import 'package:untitled/features/Koran/data/model/bookmark.dart';
 import 'package:untitled/features/Koran/presentation/manager/cubit/verse_cubit.dart';
 import 'package:untitled/features/Koran/presentation/manager/cubit/verse_state.dart';
@@ -263,6 +265,120 @@ class MiniPlayer extends StatelessWidget {
                 ),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+const _arDigits = '٠١٢٣٤٥٦٧٨٩';
+
+/// [n] in Arabic-Indic digits, as the mushaf prints them.
+String arNum(int n) =>
+    '$n'.split('').map((d) => _arDigits[int.parse(d)]).join();
+
+int juzOf(int hizbQuarter) => (hizbQuarter - 1) ~/ 8 + 1;
+
+/// What the ayah opening quarter [hizbQuarter] starts, as the mushaf's
+/// margin says it: "الجزء ٣", "الحزب ٦", "ربع الحزب ٦", ...
+String quarterLabel(int hizbQuarter) {
+  final q = hizbQuarter - 1;
+  final hizb = arNum(q ~/ 4 + 1);
+  switch (q % 4) {
+    case 0:
+      return q % 8 == 0 ? "الجزء ${arNum(q ~/ 8 + 1)}" : "الحزب $hizb";
+    case 1:
+      return "ربع الحزب $hizb";
+    case 2:
+      return "نصف الحزب $hizb";
+    default:
+      return "ثلاثة أرباع الحزب $hizb";
+  }
+}
+
+/// Previous / next sura at the end of a sura, in both reading modes.
+class SuraNavFooter extends StatelessWidget {
+  final int sura;
+  final void Function(Sura) onOpen;
+  const SuraNavFooter({super.key, required this.sura, required this.onOpen});
+
+  static Future<List<Sura>>? _suras; // read once; the list never changes
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<Sura>>(
+      future: _suras ??= DBHelper.getSuras(),
+      builder: (context, snap) {
+        final all = snap.data;
+        if (all == null) return const SizedBox(height: 72);
+        Sura? find(int n) => all.where((s) => s.number == n).firstOrNull;
+        final prev = find(sura - 1), next = find(sura + 1);
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          child: Row(
+            children: [
+              if (prev != null)
+                Expanded(
+                  child: _SuraNavButton(
+                      sura: prev, forward: false, onTap: () => onOpen(prev)),
+                ),
+              if (prev != null && next != null) const SizedBox(width: 12),
+              if (next != null)
+                Expanded(
+                  child: _SuraNavButton(
+                      sura: next, forward: true, onTap: () => onOpen(next)),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _SuraNavButton extends StatelessWidget {
+  final Sura sura;
+  final bool forward;
+  final VoidCallback onTap;
+  const _SuraNavButton(
+      {required this.sura, required this.forward, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    const teal = Color(0xFF00695C);
+    final fg = forward ? Colors.white : teal;
+    final label = Column(
+      crossAxisAlignment:
+          forward ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      children: [
+        Text(forward ? "السورة التالية" : "السورة السابقة",
+            style: TextStyle(color: fg.withValues(alpha: 0.8), fontSize: 12)),
+        Text(sura.name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+                color: fg, fontSize: 16, fontWeight: FontWeight.bold)),
+      ],
+    );
+    // arrow_back/forward mirror in RTL, so "forward" points left
+    final arrow = Icon(forward ? Icons.arrow_forward : Icons.arrow_back,
+        color: fg, size: 20);
+    return Material(
+      color: forward ? teal : Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: teal),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Row(
+            children: forward
+                ? [Expanded(child: label), const SizedBox(width: 8), arrow]
+                : [arrow, const SizedBox(width: 8), Expanded(child: label)],
           ),
         ),
       ),

@@ -6,6 +6,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:untitled/features/audio/quran_player.dart';
 import 'package:untitled/features/Koran/data/data_sources/local/db_helper.dart';
+import 'package:untitled/features/Koran/data/model/sura.dart';
 import 'package:untitled/features/Koran/data/repo/quran_repository.dart';
 import 'package:untitled/features/Koran/presentation/manager/cubit/verse_cubit.dart';
 import 'package:untitled/features/Koran/presentation/manager/cubit/verse_state.dart';
@@ -173,6 +174,7 @@ class _VerseListViewState extends State<VerseListView> {
   }
 
   StreamSubscription<PlayerFailure>? _failures;
+  Set<int> _quarterStarts = {}; // ayahs that open a hizb quarter (۞)
 
   @override
   void initState() {
@@ -180,7 +182,23 @@ class _VerseListViewState extends State<VerseListView> {
     // keep the screen on while reading or listening, in both modes
     WakelockPlus.enable();
     _failures = QuranPlayer.instance.failures.listen(_showFailure);
+    DBHelper.quarterStarts(widget.suraNumber).then((s) {
+      if (mounted) setState(() => _quarterStarts = s);
+    });
   }
+
+  /// Next / previous sura replaces this reader instead of stacking readers.
+  void _openSura(Sura s) {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+          builder: (_) =>
+              VerseListView(suraNumber: s.number, SuraName: s.name)),
+    );
+  }
+
+  Widget _footer() =>
+      SuraNavFooter(sura: widget.suraNumber, onOpen: _openSura);
 
   void _showFailure(PlayerFailure f) {
     if (!mounted) return;
@@ -227,6 +245,7 @@ class _VerseListViewState extends State<VerseListView> {
               suraName: widget.SuraName,
               ayaNumber: widget.ayaNumber,
               modeToggle: _modeToggle(),
+              footer: _footer(),
             )
           : _cards(),
     );
@@ -415,6 +434,8 @@ class _VerseListViewState extends State<VerseListView> {
                                         key: _verseKeyFor(verse.id),
                                         verse: verse,
                                         bookmark: state.bookmarks[verse.id],
+                                        quarterStart: _quarterStarts
+                                            .contains(verse.id),
                                         isPlaying:
                                             verse.id == state.playingAyahId,
                                         highlight: verse.id ==
@@ -431,6 +452,13 @@ class _VerseListViewState extends State<VerseListView> {
                             }
                             return const SliverToBoxAdapter(child: SizedBox());
                           },
+                        ),
+                        SliverToBoxAdapter(
+                          // clear of the play button / mini player
+                          child: Padding(
+                            padding: const EdgeInsets.only(bottom: 90),
+                            child: _footer(),
+                          ),
                         ),
                       ],
                     ),

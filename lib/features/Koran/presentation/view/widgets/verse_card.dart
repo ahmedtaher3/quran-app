@@ -16,6 +16,7 @@ class VerseCard extends StatelessWidget {
   final bool highlight; // <<< الجديد
   final Bookmark? bookmark;
   final bool isPlaying;
+  final bool quarterStart; // opens a hizb quarter (۞)
 
   const VerseCard({
     super.key,
@@ -23,6 +24,7 @@ class VerseCard extends StatelessWidget {
     this.highlight = false,
     this.bookmark,
     this.isPlaying = false,
+    this.quarterStart = false,
   });
 
   TextStyle get _verseStyle => AppSettings.instance.quranStyle();
@@ -163,6 +165,19 @@ class VerseCard extends StatelessWidget {
                     ),
                   ],
                 ),
+                if ((quarterStart && verse.hizbQuarter > 0) ||
+                    verse.sajda != 0) ...[
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    alignment: WrapAlignment.center,
+                    children: [
+                      if (quarterStart && verse.hizbQuarter > 0)
+                        _Mark("۞ ${quarterLabel(verse.hizbQuarter)}"),
+                      if (verse.sajda != 0) const _Mark("۩ سجدة"),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),
@@ -223,6 +238,28 @@ class VerseCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Mushaf margin note: start of a hizb quarter, or a sajda.
+class _Mark extends StatelessWidget {
+  final String text;
+  const _Mark(this.text);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppColors.tealSoft,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(text,
+          style: TextStyle(
+              fontSize: 13,
+              color: AppColors.heading,
+              fontWeight: FontWeight.w600)),
     );
   }
 }

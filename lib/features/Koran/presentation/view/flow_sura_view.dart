@@ -24,13 +24,14 @@ const _teal = Color(0xFF00695C);
 const _selectedBg = Color(0x55FFB300); // tapped word / word being recited
 const _flashBg = Color(0x40FFCA28); // ayah just jumped to, or its menu open
 const _playingBg = Color(0x2600897B); // ayah being recited
-const _arDigits = '٠١٢٣٤٥٦٧٨٩';
-String _ar(int n) => '$n'.split('').map((d) => _arDigits[int.parse(d)]).join();
+String _ar(int n) => arNum(n);
 
 typedef _AyahBox = ({int id, double top, double bottom});
 
 class FlowWord {
   final int id, ayahId, aya, page;
+  final int quarter; // hizbQuarter, 1..240
+  final bool sajda;
   final String text, audio, english;
   final String arabic; // Arabic meaning; often shared by a short phrase
   final String? source; // tafsir the meaning was checked against
@@ -41,6 +42,8 @@ class FlowWord {
         ayahId = r['ayaID'] as int,
         aya = r['ayaNumber'] as int,
         page = r['page'] as int,
+        quarter = r['hizbQuarter'] as int? ?? 0,
+        sajda = (r['sajda'] as int? ?? 0) != 0,
         text = r['text'] as String? ?? '',
         audio = r['audio'] as String? ?? '',
         english = r['translation'] as String? ?? '',
@@ -63,12 +66,14 @@ class FlowSuraView extends StatefulWidget {
   final String suraName;
   final int? ayaNumber; // open at this ayah (search, bookmarks, continue)
   final Widget? modeToggle;
+  final Widget? footer; // previous / next sura
   const FlowSuraView(
       {super.key,
       required this.sura,
       required this.suraName,
       this.ayaNumber,
-      this.modeToggle});
+      this.modeToggle,
+      this.footer});
 
   @override
   State<FlowSuraView> createState() => _FlowSuraViewState();
@@ -81,6 +86,7 @@ class _FlowSuraViewState extends State<FlowSuraView> {
   final _ayahPage = <int, int>{}; // ayahId -> page index
   final _ayahIdByNumber = <int, int>{};
   final _ayahWords = <int, List<int>>{}; // ayahId -> word ids, in order
+  Set<int> _quarterStarts = {}; // ayahs that open a hizb quarter (۞)
   List<List<FlowWord>>? _pages;
   int? _selected;
   int? _flashAyah;
@@ -127,8 +133,12 @@ class _FlowSuraViewState extends State<FlowSuraView> {
       _ayahIdByNumber[w.aya] = w.ayahId;
       (_ayahWords[w.ayahId] ??= []).add(w.id);
     }
+    final quarterStarts = await DBHelper.quarterStarts(widget.sura);
     if (!mounted) return;
-    setState(() => _pages = pages);
+    setState(() {
+      _quarterStarts = quarterStarts;
+      _pages = pages;
+    });
 
     final start = widget.ayaNumber == null
         ? null
@@ -457,8 +467,13 @@ class _FlowSuraViewState extends State<FlowSuraView> {
                       controller: _scroll,
                       // room for the play button / mini player
                       padding: const EdgeInsets.fromLTRB(16, 12, 16, 120),
-                      itemCount: pages.length + (_hasBasmala ? 1 : 0),
+                      itemCount: pages.length +
+                          (_hasBasmala ? 1 : 0) +
+                          (widget.footer != null ? 1 : 0),
                       itemBuilder: (context, i) {
+                        if (i == pages.length + (_hasBasmala ? 1 : 0)) {
+                          return widget.footer!;
+                        }
                         if (_hasBasmala && i == 0) {
                           return Padding(
                             padding: const EdgeInsets.only(bottom: 8),
@@ -478,6 +493,7 @@ class _FlowSuraViewState extends State<FlowSuraView> {
                           flashAyah: _flashAyah,
                           playingAyah: loaded?.playingAyahId,
                           bookmarks: loaded?.bookmarks ?? const {},
+                          quarterStarts: _quarterStarts,
                           onWord: _onWord,
                           onAyah: _onAyah,
                         );
@@ -498,6 +514,7 @@ class _PageParagraph extends StatefulWidget {
   final List<FlowWord> words;
   final int? selected, flashAyah, playingAyah;
   final Map<int, Bookmark> bookmarks;
+  final Set<int> quarterStarts;
   final void Function(FlowWord) onWord;
   final void Function(int ayahId) onAyah;
   const _PageParagraph(
@@ -507,6 +524,7 @@ class _PageParagraph extends StatefulWidget {
       required this.flashAyah,
       required this.playingAyah,
       required this.bookmarks,
+      required this.quarterStarts,
       required this.onWord,
       required this.onAyah});
 
@@ -626,7 +644,10 @@ class _PageParagraphState extends State<_PageParagraph> {
               Expanded(child: Divider(color: Colors.teal.shade100)),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Text(_ar(widget.words.first.page),
+                child: Text(
+                    widget.words.first.quarter > 0
+                        ? "${_ar(widget.words.first.page)} • الجزء ${_ar(juzOf(widget.words.first.quarter))}"
+                        : _ar(widget.words.first.page),
                     style: TextStyle(color: AppColors.subtle, fontSize: 13)),
               ),
               Expanded(child: Divider(color: Colors.teal.shade100)),
@@ -655,7 +676,19 @@ class _PageParagraphState extends State<_PageParagraph> {
     _wordRanges.clear();
     for (var i = 0; i < words.length; i++) {
       final w = words[i];
-      if (i == 0 || words[i - 1].ayahId != w.ayahId) start = offset;
+      if (i == 0 || words[i - 1].ayahId != w.ayahId) {
+        start = offset;
+        if (widget.quarterStarts.contains(w.ayahId) && w.quarter > 0) {
+          add(TextSpan(text: '۞ ', style: marker), 2);
+          final label = '${quarterLabel(w.quarter)} ';
+          add(
+              TextSpan(
+                  text: label,
+                  style: marker.copyWith(
+                      fontSize: AppSettings.instance.quranSize * 0.55)),
+              label.length);
+        }
+      }
       _wordRanges[w.id] = (offset, offset + w.text.length);
       final tint = w.ayahId == widget.flashAyah
           ? _flashBg
@@ -700,6 +733,7 @@ class _PageParagraphState extends State<_PageParagraph> {
                     color: Color(bookmark.color), fontWeight: FontWeight.bold),
           ),
           number.length);
+      if (w.sajda) add(TextSpan(text: ' ۩', style: marker), 2);
       _ranges[w.ayahId] = (start, offset);
       add(const TextSpan(text: ' '), 1);
     }
