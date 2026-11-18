@@ -4,9 +4,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:untitled/features/Koran/data/data_sources/local/db_helper.dart';
 import 'package:untitled/features/Koran/data/model/ayah.dart';
 import 'package:untitled/features/Koran/data/model/bookmark.dart';
-import 'package:untitled/features/Koran/presentation/view/widgets/bookmark_sheet.dart';
+import 'package:untitled/features/Koran/presentation/view/widgets/reader_controls.dart';
 import 'package:untitled/features/Koran/presentation/manager/cubit/verse_cubit.dart';
-import 'package:untitled/features/Koran/presentation/view/widgets/audio_player_sheet.dart';
 import 'package:untitled/words_dialog.dart';
 import 'package:untitled/features/tafsir/tafsir_sheet.dart';
 import 'package:untitled/features/share/share_ayah.dart';
@@ -208,29 +207,11 @@ class VerseCard extends StatelessWidget {
                   color: bookmark != null
                       ? Color(bookmark!.color)
                       : Colors.grey.shade500,
-                  onTap: () async {
-                    final cubit = context.read<VerseCubit>();
-                    final r = await showBookmarkSheet(context, bookmark);
-                    if (r == null) return;
-                    if (r.color == null) {
-                      await cubit.removeBookmark(verse.id);
-                    } else {
-                      await cubit.saveBookmark(verse, r.color!, r.note);
-                    }
-                  },
+                  onTap: () => editAyahBookmark(context, verse, bookmark),
                 ),
                 IconButton.filled(
                   icon: const Icon(Icons.play_arrow_rounded),
-                  onPressed: () {
-                    final cubit = context.read<VerseCubit>();
-                    QuranPlayer.instance
-                        .play([verse], suraName: cubit.suraName);
-                    showPlayerSheet(
-                      context,
-                      onPlaySequential: () =>
-                          cubit.playSequentiallyFrom(verse.id),
-                    );
-                  },
+                  onPressed: () => playSingleAyah(context, verse),
                   style: IconButton.styleFrom(
                     backgroundColor: const Color(0xFF00695C),
                     foregroundColor: Colors.white,

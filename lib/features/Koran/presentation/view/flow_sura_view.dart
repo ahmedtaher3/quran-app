@@ -1,20 +1,38 @@
+import 'dart:math' as math;
+
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:untitled/core/app_theme.dart';
 import 'package:untitled/core/constants/app_constants.dart';
 import 'package:untitled/features/Koran/data/data_sources/local/db_helper.dart';
+import 'package:untitled/features/Koran/data/model/ayah.dart';
+import 'package:untitled/features/Koran/data/model/bookmark.dart';
+import 'package:untitled/features/Koran/presentation/manager/cubit/verse_cubit.dart';
+import 'package:untitled/features/Koran/presentation/manager/cubit/verse_state.dart';
+import 'package:untitled/features/Koran/presentation/view/widgets/reader_controls.dart';
+import 'package:untitled/features/audio/downloads_view.dart';
 import 'package:untitled/features/audio/quran_player.dart';
+import 'package:untitled/features/share/share_ayah.dart';
 import 'package:untitled/features/tafsir/tafsir_sheet.dart';
+import 'package:untitled/words_dialog.dart';
 
 const _teal = Color(0xFF00695C);
+const _selectedBg = Color(0x55FFB300); // tapped word / word being recited
+const _flashBg = Color(0x40FFCA28); // ayah just jumped to, or its menu open
+const _playingBg = Color(0x2600897B); // ayah being recited
 const _arDigits = '٠١٢٣٤٥٦٧٨٩';
 String _ar(int n) => '$n'.split('').map((d) => _arDigits[int.parse(d)]).join();
+
+typedef _AyahBox = ({int id, double top, double bottom});
 
 class FlowWord {
   final int id, ayahId, aya, page;
   final String text, audio, english;
   final String arabic; // Arabic meaning; often shared by a short phrase
   final String? source; // tafsir the meaning was checked against
+  int pos = 0; // 1-based position in its ayah, matches the recitation timing
   bool get hasMeaning => arabic.isNotEmpty;
   FlowWord(Map<String, Object?> r)
       : id = r['id'] as int,
@@ -33,21 +51,40 @@ class FlowWord {
 
 /// Continuous mushaf-style reading: one justified paragraph per mushaf
 /// page, so lines reflow to the screen width. Tap a word to hear it and
-/// see its meaning.
+/// see its meaning; tap an ayah's number for everything the ayah cards
+/// offer (play, tafsir, word meanings, share, bookmark).
+///
+/// Needs the [VerseCubit] from [VerseListView] above it.
 class FlowSuraView extends StatefulWidget {
   final int sura;
   final String suraName;
+  final int? ayaNumber; // open at this ayah (search, bookmarks, continue)
   final Widget? modeToggle;
   const FlowSuraView(
-      {super.key, required this.sura, required this.suraName, this.modeToggle});
+      {super.key,
+      required this.sura,
+      required this.suraName,
+      this.ayaNumber,
+      this.modeToggle});
 
   @override
   State<FlowSuraView> createState() => _FlowSuraViewState();
 }
 
 class _FlowSuraViewState extends State<FlowSuraView> {
+  final _scroll = ScrollController();
+  final _listKey = GlobalKey();
+  final _pageKeys = <int, GlobalKey<_PageParagraphState>>{};
+  final _ayahPage = <int, int>{}; // ayahId -> page index
+  final _ayahIdByNumber = <int, int>{};
   List<List<FlowWord>>? _pages;
   int? _selected;
+  int? _flashAyah;
+  int? _pendingAyah; // jump requested before the pages loaded
+  int? _followed; // recited ayah already brought into view
+  bool _userScrolling = false;
+
+  bool get _hasBasmala => widget.sura != 1 && widget.sura != 9;
 
   @override
   void initState() {
@@ -55,14 +92,45 @@ class _FlowSuraViewState extends State<FlowSuraView> {
     _load();
   }
 
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
   Future<void> _load() async {
     final words = (await DBHelper.getFlowWords(widget.sura)).map(FlowWord.new);
     final pages = <List<FlowWord>>[];
+    int? ayah;
+    var pos = 0;
     for (final w in words) {
+      pos = w.ayahId == ayah ? pos + 1 : 1;
+      ayah = w.ayahId;
+      w.pos = pos;
       if (pages.isEmpty || pages.last.first.page != w.page) pages.add([]);
       pages.last.add(w);
+      _ayahPage.putIfAbsent(w.ayahId, () => pages.length - 1);
+      _ayahIdByNumber[w.aya] = w.ayahId;
     }
-    if (mounted) setState(() => _pages = pages);
+    if (!mounted) return;
+    setState(() => _pages = pages);
+
+    final start = widget.ayaNumber == null
+        ? null
+        : _ayahIdByNumber[widget.ayaNumber];
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final target = _pendingAyah ?? start;
+      _pendingAyah = null;
+      if (target != null) _goToAyah(target);
+    });
+    // short suras may never scroll: log what's on screen after the reader
+    // had time to read
+    Future.delayed(const Duration(seconds: 5), () {
+      final view = _viewRect();
+      if (mounted && view != null) {
+        DBHelper.logVerses(_onScreenAyahs(view).map((a) => a.id));
+      }
+    });
   }
 
   void _zoom(double d) {
@@ -70,9 +138,172 @@ class _FlowSuraViewState extends State<FlowSuraView> {
     s.update(quranSize: (s.quranSize + d).clamp(18, 44).toDouble());
   }
 
+  // ---- geometry ----------------------------------------------------------
+
+  Rect? _viewRect() {
+    final box = _listKey.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null || !box.attached || !box.hasSize) return null;
+    return box.localToGlobal(Offset.zero) & box.size;
+  }
+
+  /// Ayahs on screen, top to bottom, in global coordinates.
+  List<_AyahBox> _onScreenAyahs(Rect view) {
+    final out = <_AyahBox>[];
+    for (final p in _pageKeys.keys.toList()..sort()) {
+      for (final a in _pageKeys[p]!.currentState?.ayahBoxes() ?? <_AyahBox>[]) {
+        if (a.bottom > view.top && a.top < view.bottom) out.add(a);
+      }
+    }
+    return out;
+  }
+
+  /// Rough scroll offset of page [page], from the pages laid out so far.
+  double _estimateOffset(int page, Rect view) {
+    final pos = _scroll.position;
+    final built = <int, Rect>{};
+    _pageKeys.forEach((i, k) {
+      final r = k.currentState?.rect();
+      if (r != null) built[i] = r;
+    });
+    if (built.isEmpty) {
+      final count = _pages!.length + (_hasBasmala ? 1 : 0);
+      final index = page + (_hasBasmala ? 1 : 0);
+      return (pos.maxScrollExtent + pos.viewportDimension) * index / count;
+    }
+    final first = built.keys.reduce(math.min);
+    final last = built.keys.reduce(math.max);
+    final ref = page > last ? last : first;
+    final avg =
+        built.values.map((r) => r.height).reduce((a, b) => a + b) / built.length;
+    return pos.pixels + built[ref]!.top - view.top + (page - ref) * avg;
+  }
+
+  /// Scrolls so [ayahId] starts [alignment] of the way down the screen.
+  Future<void> _scrollToAyah(int ayahId, {double alignment = 0.25}) async {
+    final page = _ayahPage[ayahId];
+    if (page == null) return;
+    for (var attempt = 0; attempt < 12; attempt++) {
+      if (!mounted || !_scroll.hasClients) return;
+      final view = _viewRect();
+      if (view == null) return;
+      final pos = _scroll.position;
+      final box = _pageKeys[page]?.currentState?.ayahBox(ayahId);
+      if (box != null) {
+        final target =
+            (pos.pixels + box.top - view.top - view.height * alignment)
+                .clamp(pos.minScrollExtent, pos.maxScrollExtent);
+        if (attempt == 0) {
+          await _scroll.animateTo(target,
+              duration: const Duration(milliseconds: 450),
+              curve: Curves.easeInOut);
+        } else {
+          _scroll.jumpTo(target); // came from far away; don't animate
+        }
+        return;
+      }
+      _scroll.jumpTo(_estimateOffset(page, view)
+          .clamp(pos.minScrollExtent, pos.maxScrollExtent));
+      await WidgetsBinding.instance.endOfFrame;
+    }
+  }
+
+  Future<void> _goToAyah(int ayahId) async {
+    if (_pages == null) {
+      _pendingAyah = ayahId;
+      return;
+    }
+    await _scrollToAyah(ayahId);
+    _flash(ayahId);
+  }
+
+  void _flash(int ayahId) {
+    if (!mounted) return;
+    setState(() => _flashAyah = ayahId);
+    Future.delayed(const Duration(milliseconds: 1500), () {
+      if (mounted && _flashAyah == ayahId) setState(() => _flashAyah = null);
+    });
+  }
+
+  /// Keeps the ayah being recited on screen without jumping for every ayah.
+  void _follow(int ayahId) {
+    if (_followed == ayahId) return;
+    if (_pages == null) {
+      _pendingAyah ??= ayahId;
+      return;
+    }
+    _followed = ayahId;
+    final view = _viewRect();
+    final box = _pageKeys[_ayahPage[ayahId]]?.currentState?.ayahBox(ayahId);
+    if (view != null &&
+        box != null &&
+        box.top >= view.top + view.height * 0.05 &&
+        box.top <= view.top + view.height * 0.6) {
+      return;
+    }
+    _scrollToAyah(ayahId, alignment: 0.2);
+  }
+
+  // ---- reading position & stats -------------------------------------------
+
+  bool _onScrollNotification(ScrollNotification n) {
+    if (n is ScrollStartNotification && n.dragDetails != null) {
+      _userScrolling = true;
+    } else if (n is ScrollEndNotification) {
+      _onScrollEnd(saveSpot: _userScrolling);
+      _userScrolling = false;
+    }
+    return false;
+  }
+
+  /// Logs what was on screen for stats, and after the reader's own scroll
+  /// saves the ayah at the reading line as the place to continue from.
+  /// Jumps the app makes itself are not saved, so the spot never drifts.
+  void _onScrollEnd({required bool saveSpot}) {
+    final view = _viewRect();
+    if (view == null) return;
+    final ayahs = _onScreenAyahs(view);
+    if (ayahs.isEmpty) return;
+    DBHelper.logVerses(ayahs.map((a) => a.id));
+    if (!saveSpot) return;
+    final line = view.top + view.height * 0.25;
+    final atTop = _scroll.position.pixels <= _scroll.position.minScrollExtent;
+    final spot = atTop
+        ? ayahs.first
+        : ayahs.firstWhere((a) => a.top <= line && a.bottom >= line,
+            orElse: () => ayahs.firstWhere((a) => a.top >= line,
+                orElse: () => ayahs.last));
+    context.read<VerseCubit>().updateReadingPosition(widget.sura, spot.id);
+  }
+
+  void _onState(BuildContext context, VerseState state) {
+    if (state is! VerseLoaded) return;
+    final playing = state.playingAyahId;
+    if (playing == null) {
+      _followed = null;
+    } else {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _follow(playing));
+    }
+    if (state.showContinueDialog) {
+      final cubit = context.read<VerseCubit>();
+      showContinueReadingDialog(
+        context,
+        onContinue: () {
+          final id = cubit.lastViewedAyahId;
+          if (id != null) _goToAyah(id);
+        },
+        onRestart: () => cubit.resetProgress(widget.sura),
+      );
+    }
+  }
+
+  // ---- taps ----------------------------------------------------------------
+
   Future<void> _onWord(FlowWord w) async {
     setState(() => _selected = w.id);
-    if (w.audio.isNotEmpty) {
+    final qp = QuranPlayer.instance;
+    final reciting = qp.player.playing && qp.queue.isNotEmpty;
+    // don't cut the recitation off; "إعادة النطق" still plays the word
+    if (w.audio.isNotEmpty && !reciting) {
       QuranPlayer.instance
           .playClip('${AppConstants.wordAudioBaseUrl}${w.audio}', title: w.text);
     }
@@ -81,132 +312,240 @@ class _FlowSuraViewState extends State<FlowSuraView> {
       // size to content; long meanings scroll instead of overflowing
       isScrollControlled: true,
       useSafeArea: true,
-      builder: (_) =>
-          _WordSheet(word: w, suraName: widget.suraName, parent: context),
+      builder: (_) => _WordSheet(
+          word: w, suraName: widget.suraName, parent: context, onAyah: _onAyah),
     );
     if (mounted) setState(() => _selected = null);
   }
 
+  /// The ayah card's actions, for the ayah whose number was tapped.
+  Future<void> _onAyah(int ayahId) async {
+    final state = context.read<VerseCubit>().state;
+    if (state is! VerseLoaded) return;
+    final verse = state.verses.where((v) => v.id == ayahId).firstOrNull;
+    if (verse == null) return;
+    final bookmark = state.bookmarks[ayahId];
+    setState(() => _flashAyah = ayahId);
+    final action = await showModalBottomSheet<_AyahAction>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (_) => _AyahSheet(
+          verse: verse, suraName: widget.suraName, bookmark: bookmark),
+    );
+    if (!mounted) return;
+    setState(() => _flashAyah = null);
+    switch (action) {
+      case null:
+        return;
+      case _AyahAction.play:
+        playSingleAyah(context, verse);
+      case _AyahAction.playFrom:
+        context.read<VerseCubit>().playSequentiallyFrom(verse.id);
+      case _AyahAction.tafsir:
+        showTafsirSheet(context, verse);
+      case _AyahAction.words:
+        final words = await DBHelper.getWordsByAyah(verse.id);
+        if (!mounted) return;
+        showDialog(context: context, builder: (_) => WordsDialog(words: words));
+      case _AyahAction.share:
+        showShareAyah(context, verse, suraName: widget.suraName);
+      case _AyahAction.bookmark:
+        await editAyahBookmark(context, verse, bookmark);
+    }
+  }
+
+  // ---- build ---------------------------------------------------------------
+
   @override
   Widget build(BuildContext context) {
-    final pages = _pages;
-    final hasBasmala = widget.sura != 1 && widget.sura != 9;
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: _teal,
-        iconTheme: const IconThemeData(color: Colors.white),
-        title: Text(widget.suraName,
-            style: const TextStyle(color: Colors.white)),
-        centerTitle: true,
-        actions: [
-          IconButton(
-            tooltip: "تصغير الخط",
-            icon: const Icon(Icons.text_decrease_rounded, color: Colors.white),
-            onPressed: () => _zoom(-2),
-          ),
-          IconButton(
-            tooltip: "تكبير الخط",
-            icon: const Icon(Icons.text_increase_rounded, color: Colors.white),
-            onPressed: () => _zoom(2),
-          ),
-          if (widget.modeToggle != null) widget.modeToggle!,
-        ],
-      ),
-      body: pages == null
-          ? const Center(child: CircularProgressIndicator())
-          : ListView.builder(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 40),
-              itemCount: pages.length + (hasBasmala ? 1 : 0),
-              itemBuilder: (context, i) {
-                if (hasBasmala && i == 0) {
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Text(
-                      'بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ',
-                      textAlign: TextAlign.center,
-                      style: AppSettings.instance
-                          .quranStyle(scale: 1.05, color: AppColors.heading),
-                    ),
-                  );
-                }
-                final page = pages[i - (hasBasmala ? 1 : 0)];
-                return _PageParagraph(
-                  words: page,
-                  selected: _selected,
-                  onWord: _onWord,
-                );
-              },
+    return BlocConsumer<VerseCubit, VerseState>(
+      listener: _onState,
+      builder: (context, state) {
+        final loaded = state is VerseLoaded ? state : null;
+        final pages = _pages;
+        return PopScope(
+          canPop: false,
+          onPopInvokedWithResult: (didPop, _) async {
+            if (didPop) return;
+            final ok = await confirmLeaveWhilePlaying(context, state);
+            if (ok && context.mounted) Navigator.of(context).pop();
+          },
+          child: Scaffold(
+            appBar: AppBar(
+              backgroundColor: _teal,
+              iconTheme: const IconThemeData(color: Colors.white),
+              // shrink long names to fit beside the action buttons
+              title: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(widget.suraName,
+                    style: const TextStyle(color: Colors.white)),
+              ),
+              centerTitle: true,
+              actions: [
+                IconButton(
+                  tooltip: "تصغير الخط",
+                  icon: const Icon(Icons.text_decrease_rounded,
+                      color: Colors.white),
+                  onPressed: () => _zoom(-2),
+                ),
+                IconButton(
+                  tooltip: "تكبير الخط",
+                  icon: const Icon(Icons.text_increase_rounded,
+                      color: Colors.white),
+                  onPressed: () => _zoom(2),
+                ),
+                if (widget.modeToggle != null) widget.modeToggle!,
+                SuraDownloadButton(sura: widget.sura),
+              ],
             ),
+            body: pages == null
+                ? const Center(child: CircularProgressIndicator())
+                : NotificationListener<ScrollNotification>(
+                    onNotification: _onScrollNotification,
+                    child: ListView.builder(
+                      key: _listKey,
+                      controller: _scroll,
+                      // room for the play button / mini player
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 120),
+                      itemCount: pages.length + (_hasBasmala ? 1 : 0),
+                      itemBuilder: (context, i) {
+                        if (_hasBasmala && i == 0) {
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: Text(
+                              'بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ',
+                              textAlign: TextAlign.center,
+                              style: AppSettings.instance.quranStyle(
+                                  scale: 1.05, color: AppColors.heading),
+                            ),
+                          );
+                        }
+                        final p = i - (_hasBasmala ? 1 : 0);
+                        return _PageParagraph(
+                          key: _pageKeys.putIfAbsent(p, GlobalKey.new),
+                          words: pages[p],
+                          selected: _selected,
+                          flashAyah: _flashAyah,
+                          playingAyah: loaded?.playingAyahId,
+                          bookmarks: loaded?.bookmarks ?? const {},
+                          onWord: _onWord,
+                          onAyah: _onAyah,
+                        );
+                      },
+                    ),
+                  ),
+            floatingActionButton: readerFab(context, state, widget.suraName),
+            floatingActionButtonLocation:
+                FloatingActionButtonLocation.centerFloat,
+          ),
+        );
+      },
     );
   }
 }
 
 class _PageParagraph extends StatefulWidget {
   final List<FlowWord> words;
-  final int? selected;
+  final int? selected, flashAyah, playingAyah;
+  final Map<int, Bookmark> bookmarks;
   final void Function(FlowWord) onWord;
+  final void Function(int ayahId) onAyah;
   const _PageParagraph(
-      {required this.words, required this.selected, required this.onWord});
+      {super.key,
+      required this.words,
+      required this.selected,
+      required this.flashAyah,
+      required this.playingAyah,
+      required this.bookmarks,
+      required this.onWord,
+      required this.onAyah});
 
   @override
   State<_PageParagraph> createState() => _PageParagraphState();
 }
 
 class _PageParagraphState extends State<_PageParagraph> {
-  // one recognizer per word, owned here so they're disposed with the page
+  final _textKey = GlobalKey();
+  // recognizers owned here so they're disposed with the page
   late final _taps = [
     for (final w in widget.words)
       TapGestureRecognizer()..onTap = () => widget.onWord(w)
   ];
+  late final _ayahTaps = <int, TapGestureRecognizer>{
+    for (final w in widget.words)
+      w.ayahId: TapGestureRecognizer()..onTap = () => widget.onAyah(w.ayahId)
+  };
+  // text range of each ayah on this page, in reading order
+  final _ranges = <int, (int, int)>{};
 
   @override
   void dispose() {
-    for (final t in _taps) {
+    for (final t in [..._taps, ..._ayahTaps.values]) {
       t.dispose();
     }
     super.dispose();
   }
 
+  RenderParagraph? get _paragraph {
+    RenderObject? r = _textKey.currentContext?.findRenderObject();
+    while (r != null && r is! RenderParagraph) {
+      RenderObject? child;
+      r.visitChildren((c) => child ??= c);
+      r = child;
+    }
+    final p = r as RenderParagraph?;
+    return p != null && p.attached && p.hasSize ? p : null;
+  }
+
+  _AyahBox? _box(RenderParagraph p, int id) {
+    final range = _ranges[id];
+    if (range == null) return null;
+    final boxes = p.getBoxesForSelection(
+        TextSelection(baseOffset: range.$1, extentOffset: range.$2));
+    if (boxes.isEmpty) return null;
+    var top = double.infinity, bottom = double.negativeInfinity;
+    for (final b in boxes) {
+      top = math.min(top, b.top);
+      bottom = math.max(bottom, b.bottom);
+    }
+    final y = p.localToGlobal(Offset.zero).dy;
+    return (id: id, top: y + top, bottom: y + bottom);
+  }
+
+  _AyahBox? ayahBox(int id) {
+    final p = _paragraph;
+    return p == null ? null : _box(p, id);
+  }
+
+  List<_AyahBox> ayahBoxes() {
+    final p = _paragraph;
+    if (p == null) return const [];
+    return [
+      for (final id in _ranges.keys)
+        if (_box(p, id) case final b?) b
+    ];
+  }
+
+  Rect? rect() {
+    final box = context.findRenderObject() as RenderBox?;
+    if (box == null || !box.attached || !box.hasSize) return null;
+    return box.localToGlobal(Offset.zero) & box.size;
+  }
+
   @override
   Widget build(BuildContext context) {
-    final words = widget.words;
-    final marker = TextStyle(
-        color: AppSettings.instance.isDark
-            ? Colors.teal.shade200
-            : Colors.teal.shade700);
-    final meaningStyle = TextStyle(
-        color: AppSettings.instance.isDark
-            ? const Color(0xFFFFCA6B)
-            : const Color(0xFFB45309));
-    final spans = <InlineSpan>[];
-    for (var i = 0; i < words.length; i++) {
-      final w = words[i];
-      final sel = w.id == widget.selected;
-      spans.add(TextSpan(
-        text: w.text,
-        recognizer: _taps[i],
-        style: sel
-            ? TextStyle(
-                color: _teal,
-                backgroundColor: const Color(0x55FFB300),
-              )
-            : w.hasMeaning
-                ? meaningStyle
-                : null,
-      ));
-      final ayahEnds = i + 1 == words.length || words[i + 1].ayahId != w.ayahId;
-      spans.add(ayahEnds
-          ? TextSpan(text: ' ﴿${_ar(w.aya)}﴾ ', style: marker)
-          : const TextSpan(text: ' '));
-    }
+    final playing = widget.playingAyah;
+    final recitingHere = playing != null && _ayahTaps.containsKey(playing);
     return Column(
       children: [
-        Text.rich(
-          TextSpan(children: spans),
-          textAlign: TextAlign.justify,
-          textDirection: TextDirection.rtl,
-          style: AppSettings.instance.quranStyle(),
-        ),
+        // only the page being recited rebuilds on every word
+        recitingHere
+            ? StreamBuilder<int?>(
+                stream: QuranPlayer.instance.currentWord,
+                builder: (_, snap) => _text(snap.data),
+              )
+            : _text(null),
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 10),
           child: Row(
@@ -214,7 +553,7 @@ class _PageParagraphState extends State<_PageParagraph> {
               Expanded(child: Divider(color: Colors.teal.shade100)),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Text(_ar(words.first.page),
+                child: Text(_ar(widget.words.first.page),
                     style: TextStyle(color: AppColors.subtle, fontSize: 13)),
               ),
               Expanded(child: Divider(color: Colors.teal.shade100)),
@@ -222,6 +561,159 @@ class _PageParagraphState extends State<_PageParagraph> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _text(int? recitedPos) {
+    final words = widget.words;
+    final dark = AppSettings.instance.isDark;
+    final marker =
+        TextStyle(color: dark ? Colors.teal.shade200 : Colors.teal.shade700);
+    final meaning = dark ? const Color(0xFFFFCA6B) : const Color(0xFFB45309);
+    final spans = <InlineSpan>[];
+    var offset = 0; // in the paragraph's plain text; a WidgetSpan counts 1
+    var start = 0;
+    void add(InlineSpan s, int length) {
+      spans.add(s);
+      offset += length;
+    }
+
+    _ranges.clear();
+    for (var i = 0; i < words.length; i++) {
+      final w = words[i];
+      if (i == 0 || words[i - 1].ayahId != w.ayahId) start = offset;
+      final tint = w.ayahId == widget.flashAyah
+          ? _flashBg
+          : w.ayahId == playing
+              ? _playingBg
+              : null;
+      final highlighted = w.id == widget.selected ||
+          (w.ayahId == playing && w.pos == recitedPos);
+      add(
+          TextSpan(
+            text: w.text,
+            recognizer: _taps[i],
+            style: highlighted
+                ? const TextStyle(color: _teal, backgroundColor: _selectedBg)
+                : TextStyle(
+                    color: w.hasMeaning ? meaning : null, backgroundColor: tint),
+          ),
+          w.text.length);
+      add(TextSpan(text: ' ', style: TextStyle(backgroundColor: tint)), 1);
+      final ayahEnds = i + 1 == words.length || words[i + 1].ayahId != w.ayahId;
+      if (!ayahEnds) continue;
+
+      final bookmark = widget.bookmarks[w.ayahId];
+      if (bookmark != null) {
+        add(
+            WidgetSpan(
+              alignment: PlaceholderAlignment.middle,
+              child: Icon(Icons.bookmark_rounded,
+                  size: AppSettings.instance.quranSize * 0.7,
+                  color: Color(bookmark.color)),
+            ),
+            1);
+      }
+      final number = '﴿${_ar(w.aya)}﴾';
+      add(
+          TextSpan(
+            text: number,
+            recognizer: _ayahTaps[w.ayahId],
+            style: bookmark == null
+                ? marker
+                : marker.copyWith(
+                    color: Color(bookmark.color), fontWeight: FontWeight.bold),
+          ),
+          number.length);
+      _ranges[w.ayahId] = (start, offset);
+      add(const TextSpan(text: ' '), 1);
+    }
+    return Text.rich(
+      TextSpan(children: spans),
+      key: _textKey,
+      textAlign: TextAlign.justify,
+      textDirection: TextDirection.rtl,
+      style: AppSettings.instance.quranStyle(),
+    );
+  }
+
+  int? get playing => widget.playingAyah;
+}
+
+enum _AyahAction { play, playFrom, tafsir, words, share, bookmark }
+
+/// Same actions as the ayah card's bar, as a menu.
+class _AyahSheet extends StatelessWidget {
+  final Verse verse;
+  final String suraName;
+  final Bookmark? bookmark;
+  const _AyahSheet(
+      {required this.verse, required this.suraName, required this.bookmark});
+
+  @override
+  Widget build(BuildContext context) {
+    Widget item(IconData icon, Color color, String label, _AyahAction a) =>
+        ListTile(
+          leading: Icon(icon, color: color),
+          title: Text(label),
+          onTap: () => Navigator.pop(context, a),
+        );
+    final b = bookmark;
+    return SafeArea(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(12, 16, 12, 8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text("$suraName • آية ${_ar(verse.ayaNumber ?? 0)}",
+                style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.heading)),
+            if (b != null)
+              Container(
+                width: double.infinity,
+                margin: const EdgeInsets.fromLTRB(8, 12, 8, 0),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Color(b.color).withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.bookmark_rounded, color: Color(b.color), size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(b.note ?? "علامة محفوظة",
+                          style: TextStyle(
+                              fontSize: 14, color: Color(b.color), height: 1.5)),
+                    ),
+                  ],
+                ),
+              ),
+            const SizedBox(height: 8),
+            item(Icons.play_arrow_rounded, _teal, "تشغيل الآية",
+                _AyahAction.play),
+            item(Icons.playlist_play_rounded, _teal, "تشغيل من هذه الآية",
+                _AyahAction.playFrom),
+            item(Icons.auto_stories_rounded, Colors.orange.shade800, "التفسير",
+                _AyahAction.tafsir),
+            item(Icons.language_rounded, Colors.blue.shade700, "معاني الكلمات",
+                _AyahAction.words),
+            item(Icons.ios_share_rounded, Colors.purple.shade400, "مشاركة الآية",
+                _AyahAction.share),
+            item(
+                b != null
+                    ? Icons.bookmark_rounded
+                    : Icons.bookmark_border_rounded,
+                b != null ? Color(b.color) : Colors.grey.shade600,
+                b != null ? "تعديل العلامة" : "إضافة علامة",
+                _AyahAction.bookmark),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -264,8 +756,12 @@ class _WordSheet extends StatelessWidget {
   final FlowWord word;
   final String suraName;
   final BuildContext parent; // the sheet's own context dies on pop
+  final void Function(int ayahId) onAyah;
   const _WordSheet(
-      {required this.word, required this.suraName, required this.parent});
+      {required this.word,
+      required this.suraName,
+      required this.parent,
+      required this.onAyah});
 
   @override
   Widget build(BuildContext context) {
@@ -319,6 +815,15 @@ class _WordSheet extends StatelessWidget {
                   ),
                 ),
               ],
+            ),
+            const SizedBox(height: 4),
+            TextButton.icon(
+              onPressed: () {
+                Navigator.pop(context);
+                onAyah(word.ayahId);
+              },
+              icon: const Icon(Icons.more_horiz_rounded),
+              label: const Text("خيارات الآية"),
             ),
           ],
         ),

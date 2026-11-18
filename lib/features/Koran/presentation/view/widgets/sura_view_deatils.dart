@@ -6,9 +6,7 @@ import 'package:untitled/features/Koran/data/repo/quran_repository.dart';
 import 'package:untitled/features/Koran/presentation/manager/cubit/verse_cubit.dart';
 import 'package:untitled/features/Koran/presentation/manager/cubit/verse_state.dart';
 import 'package:untitled/features/Koran/presentation/view/widgets/verse_card.dart';
-import 'package:untitled/features/Koran/presentation/view/widgets/audio_player_sheet.dart';
-import 'package:untitled/features/Koran/data/model/ayah.dart';
-import 'package:untitled/features/audio/quran_player.dart';
+import 'package:untitled/features/Koran/presentation/view/widgets/reader_controls.dart';
 import 'package:untitled/features/audio/downloads_view.dart';
 import 'package:untitled/features/Koran/presentation/view/flow_sura_view.dart';
 import 'package:untitled/core/app_theme.dart';
@@ -177,40 +175,6 @@ class _VerseListViewState extends State<VerseListView> {
     super.dispose();
   }
 
-  Future<bool> _onWillPop(BuildContext context, VerseState state) async {
-    if (state is VerseLoaded && state.playingAyahId != null) {
-      final result = await showDialog<bool>(
-        context: context,
-        builder: (dialogContext) => AlertDialog(
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: const Text("تنبيه", style: TextStyle(fontFamily: 'Hafs')),
-          content: const Text(
-            "هل تريد إيقاف التلاوة أم الاستمرار في الخلفية؟",
-            style: TextStyle(fontFamily: 'Hafs'),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                context.read<VerseCubit>().stopSequentialPlay();
-                Navigator.pop(dialogContext, true);
-              },
-              child: const Text("إيقاف",
-                  style: TextStyle(color: Colors.red, fontFamily: 'Hafs')),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext, true),
-              child: const Text("استمرار",
-                  style: TextStyle( color: Colors.teal)),
-            ),
-          ],
-        ),
-      );
-      return result ?? false;
-    }
-    return true;
-  }
-
   Widget _modeToggle() {
     final flow = AppSettings.instance.flowReading;
     return IconButton(
@@ -223,26 +187,33 @@ class _VerseListViewState extends State<VerseListView> {
 
   @override
   Widget build(BuildContext context) {
-    if (AppSettings.instance.flowReading) {
-      return FlowSuraView(
-        sura: widget.suraNumber,
-        suraName: widget.SuraName,
-        modeToggle: _modeToggle(),
-      );
-    }
+    // One cubit for both modes: switching keeps playback, bookmarks and the
+    // reading position.
     return BlocProvider(
       create: (_) =>
           VerseCubit(QuranRepository())
             ..suraName = widget.SuraName
             ..loadVerses(widget.suraNumber,
               skipContinueDialog: widget.ayaNumber != null),
-      child: BlocBuilder<VerseCubit, VerseState>(
+      child: AppSettings.instance.flowReading
+          ? FlowSuraView(
+              sura: widget.suraNumber,
+              suraName: widget.SuraName,
+              ayaNumber: widget.ayaNumber,
+              modeToggle: _modeToggle(),
+            )
+          : _cards(),
+    );
+  }
+
+  Widget _cards() {
+    return BlocBuilder<VerseCubit, VerseState>(
         builder: (context, state) {
           return PopScope(
             canPop: false,
             onPopInvokedWithResult: (didPop, result) async {
               if (didPop) return;
-              final shouldPop = await _onWillPop(context, state);
+              final shouldPop = await confirmLeaveWhilePlaying(context, state);
               if (shouldPop && context.mounted) {
                 Navigator.of(context).pop();
               }
@@ -380,42 +351,19 @@ class _VerseListViewState extends State<VerseListView> {
                                 }
 
                                 if (state.showContinueDialog) {
-                                  Future.delayed(
-                                      const Duration(milliseconds: 300), () {
-                                    showDialog(
-                                      context: context,
-                                      builder: (_) => AlertDialog(
-                                        title: const Text("متابعة القراءة"),
-                                        content: const Text(
-                                            "تريد تكملة القراءة من حيث توقفت؟"),
-                                        actions: [
-                                          TextButton(
-                                            onPressed: () {
-                                              Navigator.pop(context);
-                                              setState(() {
-                                                _shouldScrollToSavedPosition =
-                                                    true;
-                                              });
-                                              context
-                                                  .read<VerseCubit>()
-                                                  .continueFromLastAyah();
-                                            },
-                                            child: const Text("نعم، متابعة"),
-                                          ),
-                                          TextButton(
-                                            onPressed: () {
-                                              Navigator.pop(context);
-                                              context
-                                                  .read<VerseCubit>()
-                                                  .resetProgress(
-                                                      widget.suraNumber);
-                                            },
-                                            child: const Text("البدء من جديد"),
-                                          ),
-                                        ],
-                                      ),
-                                    );
-                                  });
+                                  final cubit = context.read<VerseCubit>();
+                                  showContinueReadingDialog(
+                                    context,
+                                    onContinue: () {
+                                      if (!mounted) return;
+                                      setState(() {
+                                        _shouldScrollToSavedPosition = true;
+                                      });
+                                      cubit.continueFromLastAyah();
+                                    },
+                                    onRestart: () =>
+                                        cubit.resetProgress(widget.suraNumber),
+                                  );
                                 }
                               }
                             },
@@ -463,175 +411,14 @@ class _VerseListViewState extends State<VerseListView> {
                   ); // NotificationListener
                 },
               ),
-              floatingActionButton: state is! VerseLoaded
-                  ? null
-                  : state.playingAyahId != null
-                      ? _MiniPlayer(
-                          verse: state.verses.firstWhere(
-                              (v) => v.id == state.playingAyahId,
-                              orElse: () => state.verses.first),
-                          suraName: widget.SuraName,
-                          onStop: () =>
-                              context.read<VerseCubit>().stopSequentialPlay(),
-                        )
-                      : _PlayAllButton(
-                          isPlaying: false,
-                          onTap: () =>
-                              context.read<VerseCubit>().startSequentialPlay(),
-                        ),
+              floatingActionButton:
+                  readerFab(context, state, widget.SuraName),
               floatingActionButtonLocation:
                   FloatingActionButtonLocation.centerFloat,
             ),
           );
         },
-      ),
     );
   }
 }
 
-class _PlayAllButton extends StatelessWidget {
-  final bool isPlaying;
-  final VoidCallback onTap;
-
-  const _PlayAllButton({required this.isPlaying, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeInOut,
-      margin: const EdgeInsets.only(bottom: 10),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(30),
-          child: Ink(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: isPlaying
-                    ? [const Color(0xFFC62828), const Color(0xFFB71C1C)]
-                    : [const Color(0xFF00695C), const Color(0xFF004D40)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(30),
-              boxShadow: [
-                BoxShadow(
-                  color:
-                      (isPlaying ? Colors.red : Colors.teal).withOpacity(0.3),
-                  blurRadius: 15,
-                  offset: const Offset(0, 8),
-                ),
-              ],
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  isPlaying ? Icons.stop_rounded : Icons.play_arrow_rounded,
-                  color: Colors.white,
-                  size: 28,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  isPlaying ? "إيقاف التشغيل" : "تشغيل الكل",
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _MiniPlayer extends StatelessWidget {
-  final Verse verse;
-  final String suraName;
-  final VoidCallback onStop;
-  const _MiniPlayer(
-      {required this.verse, required this.suraName, required this.onStop});
-
-  @override
-  Widget build(BuildContext context) {
-    final qp = QuranPlayer.instance;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-      child: Material(
-        elevation: 8,
-        shadowColor: Colors.teal.withOpacity(0.3),
-        color: const Color(0xFF004D40),
-        borderRadius: BorderRadius.circular(24),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(24),
-          onTap: () => showPlayerSheet(context),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-            child: Row(
-              children: [
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text("$suraName - آية ${verse.ayaNumber}",
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold)),
-                      Text(qp.reciterName,
-                          maxLines: 1,
-                          style: const TextStyle(
-                              color: Colors.white70, fontSize: 12)),
-                    ],
-                  ),
-                ),
-                IconButton(
-                  tooltip: "الآية السابقة",
-                  icon: const Icon(Icons.skip_next_rounded, color: Colors.white),
-                  onPressed: qp.previous,
-                ),
-                StreamBuilder<bool>(
-                  stream: qp.player.playingStream,
-                  initialData: qp.player.playing,
-                  builder: (_, snap) => IconButton(
-                    icon: Icon(
-                        snap.data == true
-                            ? Icons.pause_circle_filled_rounded
-                            : Icons.play_circle_fill_rounded,
-                        color: Colors.white,
-                        size: 40),
-                    onPressed: () => snap.data == true
-                        ? qp.player.pause()
-                        : qp.player.play(),
-                  ),
-                ),
-                IconButton(
-                  tooltip: "الآية التالية",
-                  icon: const Icon(Icons.skip_previous_rounded,
-                      color: Colors.white),
-                  onPressed: qp.next,
-                ),
-                IconButton(
-                  tooltip: "إيقاف",
-                  icon: const Icon(Icons.close_rounded, color: Colors.white70),
-                  onPressed: onStop,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
