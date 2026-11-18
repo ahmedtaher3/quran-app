@@ -1,7 +1,7 @@
 import 'package:adhan/adhan.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:untitled/core/notifications.dart';
+import 'package:untitled/features/prayer/adhan_scheduler.dart';
 
 const prayerNames = {
   Prayer.fajr: "الفجر",
@@ -40,13 +40,47 @@ class PrayerSettings {
       PrayerTimes(coords, DateComponents.from(day), params);
 }
 
+/// The five obligatory prayers, in order. Sunrise is shown for reference
+/// but is never "the next prayer" and never gets an adhan.
+const fivePrayers = [
+  Prayer.fajr,
+  Prayer.dhuhr,
+  Prayer.asr,
+  Prayer.maghrib,
+  Prayer.isha,
+];
+
 /// Next prayer from [now]; after isha it rolls to tomorrow's fajr.
+/// Between fajr and sunrise this is dhuhr, not sunrise.
 (Prayer, DateTime) nextPrayer(PrayerSettings s, DateTime now) {
   final today = s.timesFor(now);
-  final p = today.nextPrayerByDateTime(now);
-  if (p != Prayer.none) return (p, today.timeForPrayer(p)!);
+  for (final p in fivePrayers) {
+    final at = today.timeForPrayer(p)!;
+    if (at.isAfter(now)) return (p, at);
+  }
   final tomorrow = s.timesFor(DateTime(now.year, now.month, now.day + 1));
   return (Prayer.fajr, tomorrow.fajr);
+}
+
+/// Latest prayer whose time has come; before fajr it is yesterday's isha.
+(Prayer, DateTime) previousPrayer(PrayerSettings s, DateTime now) {
+  final today = s.timesFor(now);
+  for (final p in fivePrayers.reversed) {
+    final at = today.timeForPrayer(p)!;
+    if (!at.isAfter(now)) return (p, at);
+  }
+  final yesterday = s.timesFor(DateTime(now.year, now.month, now.day - 1));
+  return (Prayer.isha, yesterday.isha);
+}
+
+/// Share of the time between the previous and the next prayer already
+/// gone, 0..1.
+double prayerProgress(PrayerSettings s, DateTime now) {
+  final (_, from) = previousPrayer(s, now);
+  final (_, to) = nextPrayer(s, now);
+  final total = to.difference(from).inSeconds;
+  if (total <= 0) return 0;
+  return (now.difference(from).inSeconds / total).clamp(0.0, 1.0);
 }
 
 class PrayerStore {
@@ -94,34 +128,7 @@ class PrayerStore {
     return (pos, null);
   }
 
-  static const _baseId = 200; // 200..211: today + tomorrow, 6 slots each
-
-  /// Plans adhan notifications for today and tomorrow (5 prayers, no sunrise).
-  static Future<void> scheduleAdhan(PrayerSettings s) async {
-    for (var i = 0; i < 12; i++) {
-      await Notifications.cancel(_baseId + i);
-    }
-    if (!s.notify) return;
-    final now = DateTime.now();
-    for (var d = 0; d < 2; d++) {
-      final day = DateTime(now.year, now.month, now.day + d);
-      final t = s.timesFor(day);
-      final list = [
-        (Prayer.fajr, t.fajr),
-        (Prayer.dhuhr, t.dhuhr),
-        (Prayer.asr, t.asr),
-        (Prayer.maghrib, t.maghrib),
-        (Prayer.isha, t.isha),
-      ];
-      for (var i = 0; i < list.length; i++) {
-        final (p, at) = list[i];
-        await Notifications.scheduleAt(
-          id: _baseId + d * 6 + i,
-          at: at,
-          title: "حان الآن موعد صلاة ${prayerNames[p]}",
-          body: "حيّ على الصلاة، حيّ على الفلاح",
-        );
-      }
-    }
-  }
+  /// Plans the adhan window for [s]; see [AdhanScheduler].
+  static Future<void> scheduleAdhan(PrayerSettings s) =>
+      AdhanScheduler.scheduleFor(s);
 }

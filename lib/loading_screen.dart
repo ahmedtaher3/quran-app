@@ -4,6 +4,7 @@ import 'package:untitled/features/Koran/data/data_sources/import_isolate.dart';
 import 'package:untitled/features/Koran/data/data_sources/local/db_helper.dart';
 import 'package:untitled/features/Koran/data/model/ayah.dart';
 import 'package:untitled/features/Koran/presentation/view/sura_view.dart';
+import 'package:untitled/features/prayer/prayer_launch.dart';
 
 class LoadingScreen extends StatefulWidget {
   const LoadingScreen({super.key});
@@ -56,9 +57,10 @@ class _LoadingScreenState extends State<LoadingScreen>
       });
     }
 
-    // 3. Ensure minimum display time of 4 seconds to read the Ayah
+    // 3. Ensure minimum display time of 4 seconds to read the Ayah,
+    // unless the user came from the adhan notification
     final elapsed = DateTime.now().difference(startTime);
-    if (elapsed < const Duration(seconds: 5)) {
+    if (!PrayerLaunch.pending && elapsed < const Duration(seconds: 5)) {
       await Future.delayed(const Duration(seconds: 5) - elapsed);
     }
 
@@ -77,6 +79,7 @@ class _LoadingScreenState extends State<LoadingScreen>
         transitionDuration: Duration(milliseconds: 1000),
       ),
     );
+    PrayerLaunch.homeReady(); // opens the prayer screen if a tap is waiting
   }
 
   @override

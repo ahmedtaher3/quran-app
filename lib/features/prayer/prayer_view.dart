@@ -6,35 +6,79 @@ import 'package:flutter/material.dart';
 import 'package:untitled/core/app_theme.dart';
 import 'package:flutter_compass/flutter_compass.dart';
 import 'package:untitled/core/notifications.dart';
+import 'package:untitled/features/prayer/adhan_scheduler.dart';
+import 'package:untitled/features/prayer/prayer_clock.dart';
 import 'package:untitled/features/prayer/prayer_service.dart';
+import 'package:untitled/features/prayer/qibla_sensor.dart';
 
 const _teal = Color(0xFF00695C);
 
 class PrayerView extends StatefulWidget {
   const PrayerView({super.key});
 
+  static const routeName = '/prayer';
+
   @override
   State<PrayerView> createState() => _PrayerViewState();
 }
 
-class _PrayerViewState extends State<PrayerView> {
+class _PrayerViewState extends State<PrayerView> with WidgetsBindingObserver {
   PrayerSettings? _s;
   String? _error;
   bool _locating = false;
+  PrayerClock? _clock;
+  double _declination = 0;
+  bool _exactOk = true;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _init();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _clock?.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // back from the "Alarms & reminders" settings page, or a long sleep
+    if (state == AppLifecycleState.resumed) _refreshExact();
+  }
+
+  Future<void> _refreshExact() async {
+    final ok = await Notifications.canScheduleExact();
+    if (mounted && ok != _exactOk) setState(() => _exactOk = ok);
+    await AdhanScheduler.ensureFresh();
   }
 
   Future<void> _init() async {
     final s = await PrayerStore.load();
     if (s != null) {
-      setState(() => _s = s);
-      PrayerStore.scheduleAdhan(s); // keep the next 2 days planned
+      _apply(s);
+      _refreshExact();
     } else {
       await _locate();
+    }
+  }
+
+  /// Every settings change goes through here: list clock + compass fix.
+  void _apply(PrayerSettings s) {
+    final moved = _s == null || _s!.lat != s.lat || _s!.lng != s.lng;
+    setState(() => _s = s);
+    if (_clock == null) {
+      _clock = PrayerClock(s)..start();
+    } else {
+      _clock!.settings = s;
+    }
+    if (moved) {
+      QiblaSensor.declination(s.lat, s.lng).then((d) {
+        if (mounted) setState(() => _declination = d);
+      });
     }
   }
 
@@ -61,10 +105,9 @@ class _PrayerViewState extends State<PrayerView> {
       old?.notify ?? false,
     );
     await PrayerStore.save(s);
-    setState(() {
-      _s = s;
-      _locating = false;
-    });
+    if (!mounted) return;
+    setState(() => _locating = false);
+    _apply(s);
   }
 
   Future<void> _update(PrayerSettings s) async {
@@ -72,7 +115,9 @@ class _PrayerViewState extends State<PrayerView> {
       await Notifications.requestPermission();
     }
     await PrayerStore.save(s);
-    setState(() => _s = s);
+    if (!mounted) return;
+    _apply(s);
+    _refreshExact();
   }
 
   @override
@@ -113,7 +158,13 @@ class _PrayerViewState extends State<PrayerView> {
         ),
         body: _s == null
             ? _empty()
-            : TabBarView(children: [_times(_s!), _QiblaTab(s: _s!)]),
+            : TabBarView(children: [
+                ListenableBuilder(
+                  listenable: _clock!,
+                  builder: (context, _) => _times(_s!),
+                ),
+                _QiblaTab(s: _s!, declination: _declination),
+              ]),
       ),
     );
   }
@@ -202,6 +253,38 @@ class _PrayerViewState extends State<PrayerView> {
           secondary: const Icon(Icons.notifications_active_rounded,
               color: _teal),
         ),
+        if (s.notify)
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: TextButton.icon(
+              onPressed: () async {
+                await AdhanScheduler.scheduleTest();
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                    content: Text("سيصلك أذان تجريبي خلال ثوانٍ")));
+              },
+              icon: const Icon(Icons.play_circle_outline_rounded),
+              label: const Text("جرّب الأذان"),
+            ),
+          ),
+        if (s.notify && !_exactOk)
+          Card(
+            elevation: 0,
+            color: const Color(0xFFFFB300).withValues(alpha: 0.15),
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16)),
+            child: ListTile(
+              leading:
+                  const Icon(Icons.alarm_rounded, color: Color(0xFFB26A00)),
+              title: const Text("قد يتأخر الأذان بضع دقائق"),
+              subtitle: const Text(
+                  "اسمح بـ«المنبهات والتذكيرات» ليُرفع الأذان في وقته بالضبط"),
+              trailing: TextButton(
+                onPressed: Notifications.requestExactAlarms,
+                child: const Text("تفعيل"),
+              ),
+            ),
+          ),
         ListTile(
           leading: const Icon(Icons.calculate_rounded, color: _teal),
           title: const Text("طريقة الحساب"),
@@ -243,7 +326,10 @@ class _PrayerViewState extends State<PrayerView> {
 
 class _QiblaTab extends StatelessWidget {
   final PrayerSettings s;
-  const _QiblaTab({required this.s});
+
+  /// Degrees to add to the raw Android heading to get true north.
+  final double declination;
+  const _QiblaTab({required this.s, required this.declination});
 
   @override
   Widget build(BuildContext context) {
@@ -251,7 +337,9 @@ class _QiblaTab extends StatelessWidget {
     return StreamBuilder<CompassEvent>(
       stream: FlutterCompass.events,
       builder: (context, snap) {
-        final heading = snap.data?.heading;
+        final raw = snap.data?.heading;
+        final heading =
+            raw == null ? null : QiblaSensor.trueHeading(raw, declination);
         final hasCompass = heading != null;
         // dial rotates so north on the dial matches real north; the kaaba
         // marker sits at the qibla bearing on that dial
@@ -271,7 +359,7 @@ class _QiblaTab extends StatelessWidget {
               style: TextStyle(
                   fontSize: 17,
                   height: 1.8,
-                  color: aligned ? Colors.green.shade700 : Colors.black87,
+                  color: aligned ? Colors.green.shade700 : AppColors.text,
                   fontWeight: aligned ? FontWeight.bold : FontWeight.normal),
             ),
             const SizedBox(height: 24),
@@ -295,6 +383,13 @@ class _QiblaTab extends StatelessWidget {
                 "اتجاه الهاتف: ${heading.toStringAsFixed(0)}°",
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.grey.shade500),
+              ),
+            if (hasCompass && declination != 0)
+              Text(
+                "مُصحَّح بالانحراف المغناطيسي "
+                "(${declination >= 0 ? '+' : ''}${declination.toStringAsFixed(1)}°)",
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
               ),
             const SizedBox(height: 12),
             Text(
