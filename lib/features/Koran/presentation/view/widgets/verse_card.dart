@@ -173,8 +173,10 @@ class VerseCard extends StatelessWidget {
                     alignment: WrapAlignment.center,
                     children: [
                       if (quarterStart && verse.hizbQuarter > 0)
-                        _Mark("۞ ${quarterLabel(verse.hizbQuarter)}"),
-                      if (verse.sajda != 0) const _Mark("۩ سجدة"),
+                        // the ayah text already starts with ۞ / carries ۩;
+                        // the chip adds what the mushaf margin says
+                        _Mark(quarterLabel(verse.hizbQuarter)),
+                      if (verse.sajda != 0) const _Mark("موضع سجدة"),
                     ],
                   ),
                 ],

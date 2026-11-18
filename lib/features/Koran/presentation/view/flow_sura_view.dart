@@ -231,6 +231,11 @@ class _FlowSuraViewState extends State<FlowSuraView> {
     }
     await _scrollToAyah(ayahId);
     _flash(ayahId);
+    // save exactly this ayah (not whatever the reading line lands on), so
+    // switching modes or reopening returns here without drifting
+    if (mounted) {
+      context.read<VerseCubit>().updateReadingPosition(widget.sura, ayahId);
+    }
   }
 
   void _flash(int ayahId) {
