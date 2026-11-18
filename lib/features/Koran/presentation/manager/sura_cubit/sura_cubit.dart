@@ -33,7 +33,9 @@ class SuraCubit extends Cubit<SuraState> {
     final verse =
         lastAyahId == null ? null : await DBHelper.getVerseById(lastAyahId);
     emit(SuraLoaded(allSuras,
-        lastReadSura: lastSura, lastReadAya: verse?.ayaNumber));
+        lastReadSura: lastSura,
+        lastReadAya: verse?.ayaNumber,
+        lastReadPage: verse?.page));
   }
 
   void searchSuras(String query) {

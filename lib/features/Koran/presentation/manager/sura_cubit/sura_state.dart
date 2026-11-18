@@ -10,7 +10,9 @@ class SuraLoaded extends SuraState {
   final List<Sura> suras;
   final int? lastReadSura; // <<< الجديد
   final int? lastReadAya;
-  SuraLoaded(this.suras, {this.lastReadSura, this.lastReadAya});
+  final int? lastReadPage; // mushaf page of that ayah
+  SuraLoaded(this.suras,
+      {this.lastReadSura, this.lastReadAya, this.lastReadPage});
 }
 
 class SuraError extends SuraState {
