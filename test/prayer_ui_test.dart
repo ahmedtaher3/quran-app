@@ -10,6 +10,7 @@ import 'package:untitled/features/prayer/prayer_service.dart';
 import 'package:untitled/features/prayer/widgets/prayer_hero_card.dart';
 import 'package:untitled/features/prayer/widgets/prayer_times_list.dart';
 import 'package:untitled/features/prayer/widgets/qibla_compass.dart';
+import 'package:untitled/features/prayer/widgets/time_format.dart';
 
 // Cairo
 const s = PrayerSettings(
@@ -77,6 +78,24 @@ void main() {
       await tester.pumpWidget(const SizedBox()); // stop the 1s ticker
     });
   }
+
+  testWidgets('prayer time keeps h:mm together, 12h and 24h', (tester) async {
+    late String t12, t24;
+    await tester.pumpWidget(_host(Builder(builder: (context) {
+      t12 = prayerTime(context, DateTime(2026, 3, 1, 16, 58));
+      return const SizedBox();
+    })));
+    expect(t12, contains('4:58'));
+    expect(t12, endsWith('م'));
+    await tester.pumpWidget(MediaQuery(
+      data: const MediaQueryData(alwaysUse24HourFormat: true),
+      child: Builder(builder: (context) {
+        t24 = prayerTime(context, DateTime(2026, 3, 1, 4, 5));
+        return const SizedBox();
+      }),
+    ));
+    expect(t24, contains('04:05'));
+  });
 
   test('countdown format', () {
     expect(formatCountdown(const Duration(hours: 1, minutes: 2, seconds: 3)), '01:02:03');

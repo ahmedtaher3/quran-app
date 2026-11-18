@@ -2,6 +2,7 @@ import 'package:adhan/adhan.dart';
 import 'package:flutter/material.dart';
 import 'package:untitled/core/app_theme.dart';
 import 'package:untitled/features/prayer/prayer_service.dart';
+import 'package:untitled/features/prayer/widgets/time_format.dart';
 
 const _icons = {
   Prayer.fajr: Icons.wb_twilight_rounded,
@@ -126,7 +127,7 @@ class _Row extends StatelessWidget {
                 ],
               ),
             ),
-            Text(TimeOfDay.fromDateTime(time).format(context),
+            Text(prayerTime(context, time),
                 style: TextStyle(
                     fontSize: 15,
                     fontWeight: isNext ? FontWeight.bold : FontWeight.w500,

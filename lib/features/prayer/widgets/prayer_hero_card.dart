@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:untitled/core/app_theme.dart';
 import 'package:untitled/features/prayer/prayer_service.dart';
+import 'package:untitled/features/prayer/widgets/time_format.dart';
 
 String _two(int n) => n.toString().padLeft(2, '0');
 
@@ -43,7 +44,7 @@ class _PrayerHeroCardState extends State<PrayerHeroCard> {
     final progress = prayerProgress(s, now);
     final left = at.difference(now);
     final tomorrow = at.day != now.day;
-    final time = TimeOfDay.fromDateTime(at).format(context);
+    final time = prayerTime(context, at);
     final dark = AppSettings.instance.isDark;
     final noMotion = MediaQuery.disableAnimationsOf(context);
 
@@ -112,7 +113,7 @@ class _PrayerHeroCardState extends State<PrayerHeroCard> {
                       Expanded(
                         child: Text(
                           'بعد ${prayerNames[prev]} '
-                          '${TimeOfDay.fromDateTime(from).format(context)}',
+                          '${prayerTime(context, from)}',
                           style: const TextStyle(color: Colors.white70, fontSize: 12),
                           overflow: TextOverflow.ellipsis,
                         ),
