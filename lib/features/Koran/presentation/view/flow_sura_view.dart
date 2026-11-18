@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:untitled/core/app_theme.dart';
 import 'package:untitled/core/constants/app_constants.dart';
@@ -51,8 +53,9 @@ class FlowWord {
 
 /// Continuous mushaf-style reading: one justified paragraph per mushaf
 /// page, so lines reflow to the screen width. Tap a word to hear it and
-/// see its meaning; tap an ayah's number for everything the ayah cards
-/// offer (play, tafsir, word meanings, share, bookmark).
+/// see its meaning; tap an ayah's number, or long-press any of its words,
+/// for everything the ayah cards offer (play, tafsir, word meanings, share,
+/// bookmark).
 ///
 /// Needs the [VerseCubit] from [VerseListView] above it.
 class FlowSuraView extends StatefulWidget {
@@ -77,23 +80,34 @@ class _FlowSuraViewState extends State<FlowSuraView> {
   final _pageKeys = <int, GlobalKey<_PageParagraphState>>{};
   final _ayahPage = <int, int>{}; // ayahId -> page index
   final _ayahIdByNumber = <int, int>{};
+  final _ayahWords = <int, List<int>>{}; // ayahId -> word ids, in order
   List<List<FlowWord>>? _pages;
   int? _selected;
   int? _flashAyah;
   int? _pendingAyah; // jump requested before the pages loaded
   int? _followed; // recited ayah already brought into view
   bool _userScrolling = false;
+  bool _following = false; // a follow scroll is animating
+  DateTime _lastUserScroll = DateTime(0);
+  StreamSubscription<int?>? _recitedWord;
 
   bool get _hasBasmala => widget.sura != 1 && widget.sura != 9;
+
+  /// The reader scrolled away during a recitation: let them look around
+  /// for a moment before following the reciter again.
+  bool get _userScrolledRecently =>
+      DateTime.now().difference(_lastUserScroll) < const Duration(seconds: 5);
 
   @override
   void initState() {
     super.initState();
     _load();
+    _recitedWord = QuranPlayer.instance.currentWord.listen(_followWord);
   }
 
   @override
   void dispose() {
+    _recitedWord?.cancel();
     _scroll.dispose();
     super.dispose();
   }
@@ -111,6 +125,7 @@ class _FlowSuraViewState extends State<FlowSuraView> {
       pages.last.add(w);
       _ayahPage.putIfAbsent(w.ayahId, () => pages.length - 1);
       _ayahIdByNumber[w.aya] = w.ayahId;
+      (_ayahWords[w.ayahId] ??= []).add(w.id);
     }
     if (!mounted) return;
     setState(() => _pages = pages);
@@ -231,6 +246,7 @@ class _FlowSuraViewState extends State<FlowSuraView> {
       _pendingAyah ??= ayahId;
       return;
     }
+    if (_userScrolledRecently) return; // the word follow catches up later
     _followed = ayahId;
     final view = _viewRect();
     final box = _pageKeys[_ayahPage[ayahId]]?.currentState?.ayahBox(ayahId);
@@ -243,9 +259,42 @@ class _FlowSuraViewState extends State<FlowSuraView> {
     _scrollToAyah(ayahId, alignment: 0.2);
   }
 
+  /// Long ayahs run past the screen: keep the word being recited in view.
+  Future<void> _followWord(int? pos) async {
+    if (pos == null || _pages == null || _following || !mounted) return;
+    if (_userScrolledRecently) return;
+    final state = context.read<VerseCubit>().state;
+    final ayah = state is VerseLoaded ? state.playingAyahId : null;
+    final words = _ayahWords[ayah];
+    if (ayah == null || words == null || pos > words.length) return;
+    final view = _viewRect();
+    final box =
+        _pageKeys[_ayahPage[ayah]]?.currentState?.wordBox(words[pos - 1]);
+    if (view == null || box == null || !_scroll.hasClients) return;
+    if (box.top >= view.top + view.height * 0.1 &&
+        box.bottom <= view.top + view.height * 0.75) {
+      return; // comfortably on screen
+    }
+    final p = _scroll.position;
+    _following = true;
+    try {
+      await _scroll.animateTo(
+          (p.pixels + box.top - view.top - view.height * 0.3)
+              .clamp(p.minScrollExtent, p.maxScrollExtent),
+          duration: const Duration(milliseconds: 400),
+          curve: Curves.easeInOut);
+    } finally {
+      _following = false;
+    }
+  }
+
   // ---- reading position & stats -------------------------------------------
 
   bool _onScrollNotification(ScrollNotification n) {
+    if ((n is ScrollStartNotification && n.dragDetails != null) ||
+        (n is ScrollUpdateNotification && n.dragDetails != null)) {
+      _lastUserScroll = DateTime.now();
+    }
     if (n is ScrollStartNotification && n.dragDetails != null) {
       _userScrolling = true;
     } else if (n is ScrollEndNotification) {
@@ -476,8 +525,9 @@ class _PageParagraphState extends State<_PageParagraph> {
     for (final w in widget.words)
       w.ayahId: TapGestureRecognizer()..onTap = () => widget.onAyah(w.ayahId)
   };
-  // text range of each ayah on this page, in reading order
+  // text range of each ayah on this page, in reading order, and of each word
   final _ranges = <int, (int, int)>{};
+  final _wordRanges = <int, (int, int)>{};
 
   @override
   void dispose() {
@@ -498,8 +548,8 @@ class _PageParagraphState extends State<_PageParagraph> {
     return p != null && p.attached && p.hasSize ? p : null;
   }
 
-  _AyahBox? _box(RenderParagraph p, int id) {
-    final range = _ranges[id];
+  _AyahBox? _box(RenderParagraph p, int id, [Map<int, (int, int)>? of]) {
+    final range = (of ?? _ranges)[id];
     if (range == null) return null;
     final boxes = p.getBoxesForSelection(
         TextSelection(baseOffset: range.$1, extentOffset: range.$2));
@@ -516,6 +566,26 @@ class _PageParagraphState extends State<_PageParagraph> {
   _AyahBox? ayahBox(int id) {
     final p = _paragraph;
     return p == null ? null : _box(p, id);
+  }
+
+  _AyahBox? wordBox(int wordId) {
+    final p = _paragraph;
+    return p == null ? null : _box(p, wordId, _wordRanges);
+  }
+
+  /// Long-press anywhere in an ayah opens its menu: the number alone is a
+  /// small target.
+  void _onLongPress(LongPressStartDetails d) {
+    final p = _paragraph;
+    if (p == null) return;
+    final at = p.getPositionForOffset(p.globalToLocal(d.globalPosition)).offset;
+    for (final e in _ranges.entries) {
+      if (at >= e.value.$1 && at <= e.value.$2) {
+        HapticFeedback.selectionClick();
+        widget.onAyah(e.key);
+        return;
+      }
+    }
   }
 
   List<_AyahBox> ayahBoxes() {
@@ -539,13 +609,16 @@ class _PageParagraphState extends State<_PageParagraph> {
     final recitingHere = playing != null && _ayahTaps.containsKey(playing);
     return Column(
       children: [
-        // only the page being recited rebuilds on every word
-        recitingHere
-            ? StreamBuilder<int?>(
-                stream: QuranPlayer.instance.currentWord,
-                builder: (_, snap) => _text(snap.data),
-              )
-            : _text(null),
+        GestureDetector(
+          onLongPressStart: _onLongPress,
+          // only the page being recited rebuilds on every word
+          child: recitingHere
+              ? StreamBuilder<int?>(
+                  stream: QuranPlayer.instance.currentWord,
+                  builder: (_, snap) => _text(snap.data),
+                )
+              : _text(null),
+        ),
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 10),
           child: Row(
@@ -579,9 +652,11 @@ class _PageParagraphState extends State<_PageParagraph> {
     }
 
     _ranges.clear();
+    _wordRanges.clear();
     for (var i = 0; i < words.length; i++) {
       final w = words[i];
       if (i == 0 || words[i - 1].ayahId != w.ayahId) start = offset;
+      _wordRanges[w.id] = (offset, offset + w.text.length);
       final tint = w.ayahId == widget.flashAyah
           ? _flashBg
           : w.ayahId == playing
