@@ -110,9 +110,8 @@ void main() {
 
   group('hijri date', () {
     test('Arabic Umm al-Qura text', () {
-      final txt = HijriDate.format(DateTime(2026, 11, 18));
-      expect(txt, contains('جمادى'));
-      expect(txt, endsWith('هـ'));
+      // 18 Nov 2026 = 8 Jumada al-Akhirah 1448 (Umm al-Qura)
+      expect(HijriDate.format(DateTime(2026, 11, 18)), '8 جمادى الآخرة 1448 هـ');
     });
 
     test('adjustment moves the day', () {
