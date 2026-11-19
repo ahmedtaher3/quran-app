@@ -19,15 +19,26 @@ String formatCountdown(Duration d) {
 class PrayerHeroCard extends StatefulWidget {
   final PrayerSettings settings;
   final VoidCallback? onAlertTap;
-  const PrayerHeroCard({super.key, required this.settings, this.onAlertTap});
+
+  /// Injectable for tests; the card reads it on every tick.
+  final DateTime Function() clock;
+  const PrayerHeroCard(
+      {super.key, required this.settings, this.onAlertTap, this.clock = DateTime.now});
 
   @override
   State<PrayerHeroCard> createState() => _PrayerHeroCardState();
 }
 
 class _PrayerHeroCardState extends State<PrayerHeroCard> {
-  late final Timer _t =
-      Timer.periodic(const Duration(seconds: 1), (_) => setState(() {}));
+  // Started in initState: a lazy `late final _t = Timer.periodic(...)` is
+  // only created on first read, which was dispose(), so it never ticked.
+  late final Timer _t;
+
+  @override
+  void initState() {
+    super.initState();
+    _t = Timer.periodic(const Duration(seconds: 1), (_) => setState(() {}));
+  }
 
   @override
   void dispose() {
@@ -38,7 +49,7 @@ class _PrayerHeroCardState extends State<PrayerHeroCard> {
   @override
   Widget build(BuildContext context) {
     final s = widget.settings;
-    final now = DateTime.now();
+    final now = widget.clock();
     final (next, at) = nextPrayer(s, now);
     final (prev, from) = previousPrayer(s, now);
     final progress = prayerProgress(s, now);

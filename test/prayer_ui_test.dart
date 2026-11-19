@@ -97,6 +97,22 @@ void main() {
     expect(t24, contains('04:05'));
   });
 
+  testWidgets('the countdown ticks every second', (tester) async {
+    // the card only re-reads the clock when its own timer fires: if the
+    // timer never starts, the text never changes
+    var t = DateTime(2026, 3, 1, 13);
+    await tester.pumpWidget(_host(PrayerHeroCard(settings: s, clock: () => t)));
+    String shown() => tester
+        .widgetList<Text>(find.byType(Text))
+        .map((t) => t.data ?? '')
+        .firstWhere((d) => RegExp(r'^\d\d:\d\d:\d\d$').hasMatch(d));
+    final before = shown();
+    t = t.add(const Duration(seconds: 5));
+    await tester.pump(const Duration(milliseconds: 1100));
+    expect(shown(), isNot(before));
+    await tester.pumpWidget(const SizedBox()); // stop the ticker
+  });
+
   test('countdown format', () {
     expect(formatCountdown(const Duration(hours: 1, minutes: 2, seconds: 3)), '01:02:03');
     expect(formatCountdown(const Duration(seconds: -5)), '00:00:00');
