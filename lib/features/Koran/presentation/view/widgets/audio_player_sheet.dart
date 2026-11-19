@@ -8,18 +8,24 @@ import 'package:untitled/features/audio/downloads_view.dart';
 const _teal = Color(0xFF00695C);
 
 /// Controls for the shared [QuranPlayer]: whatever is playing right now.
-void showPlayerSheet(BuildContext context, {VoidCallback? onPlaySequential}) {
-  showModalBottomSheet(
+/// [settingsOnly] shows just reciter, speed and repeat (from the reader's
+/// menu, when nothing may be playing).
+Future<void> showPlayerSheet(BuildContext context,
+    {VoidCallback? onPlaySequential, bool settingsOnly = false}) {
+  return showModalBottomSheet(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (_) => PlayerSheet(onPlaySequential: onPlaySequential),
+    builder: (_) => PlayerSheet(
+        onPlaySequential: onPlaySequential, settingsOnly: settingsOnly),
   );
 }
 
 class PlayerSheet extends StatefulWidget {
   final VoidCallback? onPlaySequential;
-  const PlayerSheet({super.key, this.onPlaySequential});
+  final bool settingsOnly;
+  const PlayerSheet(
+      {super.key, this.onPlaySequential, this.settingsOnly = false});
 
   @override
   State<PlayerSheet> createState() => _PlayerSheetState();
@@ -57,6 +63,13 @@ class _PlayerSheetState extends State<PlayerSheet> {
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
+              if (widget.settingsOnly)
+                Text("إعدادات التلاوة",
+                    style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.heading))
+              else
               StreamBuilder<Verse?>(
                 stream: qp.currentVerse,
                 initialData: qp.current,
@@ -80,10 +93,12 @@ class _PlayerSheetState extends State<PlayerSheet> {
                   );
                 },
               ),
-              const SizedBox(height: 16),
-              _progress(),
-              const SizedBox(height: 8),
-              _controls(),
+              if (!widget.settingsOnly) ...[
+                const SizedBox(height: 16),
+                _progress(),
+                const SizedBox(height: 8),
+                _controls(),
+              ],
               const SizedBox(height: 20),
               _label("سرعة التلاوة"),
               _chips<double>(

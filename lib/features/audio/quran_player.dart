@@ -64,6 +64,14 @@ class VerseTiming {
   }
 }
 
+/// A play that failed (offline, server down), for the screen to show with a
+/// retry button.
+class PlayerFailure {
+  final String message;
+  final Future<void> Function() retry;
+  const PlayerFailure(this.message, this.retry);
+}
+
 /// The app's only audio player (just_audio_background allows one).
 /// A queue is a list of verses; "repeat each ayah N times" is done by
 /// putting each verse N times in the playlist, "repeat range" by LoopMode.all.
@@ -72,6 +80,21 @@ class QuranPlayer {
   static final instance = QuranPlayer._();
 
   final player = AudioPlayer();
+
+  final _failures = StreamController<PlayerFailure>.broadcast();
+  DateTime _lastFailure = DateTime(0);
+
+  /// Failed plays. A load error can surface both from the load call and on
+  /// the player's event stream, so repeats within 2s are dropped.
+  Stream<PlayerFailure> get failures => _failures.stream;
+
+  void _fail(String message, Future<void> Function() retry) {
+    final now = DateTime.now();
+    if (now.difference(_lastFailure) < const Duration(seconds: 2)) return;
+    _lastFailure = now;
+    _failures.add(PlayerFailure(message, retry));
+  }
+
   List<Verse> _queue = [];
   String? _suraName;
   int _repeatEach = 1;
@@ -104,9 +127,17 @@ class QuranPlayer {
     return out.stream;
   }
 
+  /// Queue index [play] is loading. Until the load finishes,
+  /// player.currentIndex still points into the previous source (often a word
+  /// clip at 0), which would report the sura's first ayah as playing.
+  int? _starting;
+
   Verse? get current {
+    if (_queue.isEmpty) return null;
+    final s = _starting;
+    if (s != null) return _queue[s.clamp(0, _queue.length - 1)];
     final i = player.currentIndex;
-    if (i == null || _queue.isEmpty) return null;
+    if (i == null) return null;
     return _queue[(i ~/ _repeatEach).clamp(0, _queue.length - 1)];
   }
 
@@ -245,22 +276,56 @@ class QuranPlayer {
             ),
           ),
     ];
-    await player.setLoopMode(loopRange ? LoopMode.all : LoopMode.off);
-    await player.setSpeed(speed);
-    await player.setAudioSources(sources, initialIndex: start * _repeatEach);
-    player.play();
+    final load = ++_loads;
+    _starting = start;
+    try {
+      // Drop whatever is still loading first (usually a word clip): if its
+      // server is unreachable, its error would otherwise land on this load
+      // and the recitation would never start.
+      await player.stop();
+      await player.setAudioSources(sources, initialIndex: start * _repeatEach);
+      await player.setLoopMode(loopRange ? LoopMode.all : LoopMode.off);
+      await player.setSpeed(speed);
+    } catch (e) {
+      // offline: leave the player idle. If a newer play/clip/stop replaced
+      // this load, the queue is theirs now and there is nothing to report.
+      if (load == _loads) {
+        _queue = [];
+        _fail("تعذّر تشغيل التلاوة. تأكد من الاتصال بالإنترنت أو حمّل السورة.",
+            () => play(verses, start: start, suraName: suraName));
+      }
+      return;
+    } finally {
+      if (load == _loads) _starting = null;
+    }
+    if (load == _loads) player.play(); // not stopped or replaced meanwhile
   }
+
+  int _loads = 0; // bumped by every play/clip so a stale load can tell
 
   /// One-off clip (word pronunciation); replaces any queue.
   Future<void> playClip(String url, {String title = ''}) async {
+    final load = ++_loads;
+    _starting = null;
     _queue = [];
-    await player.setLoopMode(LoopMode.off);
-    await player.setAudioSource(AudioSource.uri(Uri.parse(url),
-        tag: MediaItem(id: url, title: title)));
-    player.play();
+    try {
+      await player.setAudioSource(AudioSource.uri(Uri.parse(url),
+          tag: MediaItem(id: url, title: title)));
+      await player.setLoopMode(LoopMode.off);
+    } catch (_) {
+      // word audio unreachable; stay quiet if another play replaced it
+      if (load == _loads) {
+        _fail("تعذّر تشغيل صوت الكلمة. تأكد من الاتصال بالإنترنت.",
+            () => playClip(url, title: title));
+      }
+      return;
+    }
+    if (load == _loads) player.play();
   }
 
   Future<void> stop() async {
+    _loads++;
+    _starting = null;
     _queue = [];
     await player.stop();
   }
@@ -312,8 +377,17 @@ class QuranPlayer {
     await play(_queue, start: _queue.indexOf(cur), suraName: _suraName);
   }
 
-  /// Log played verses for stats. Call once at startup.
+  /// Log played verses for stats, and report ayahs that fail to load
+  /// mid-queue. Call once at startup.
   void startLogging() {
+    player.playbackEventStream.listen((_) {}, onError: (Object e, _) {
+      // during play() the load error is reported there
+      if (_starting != null || _queue.isEmpty) return;
+      final q = _queue, name = _suraName, at = current;
+      final i = at == null ? 0 : q.indexOf(at);
+      _fail("تعذّر تحميل الآية. تأكد من الاتصال بالإنترنت أو حمّل السورة.",
+          () => play(q, start: i < 0 ? 0 : i, suraName: name));
+    });
     currentVerse.listen((v) {
       if (v != null) DBHelper.logVerses([v.id]);
     });

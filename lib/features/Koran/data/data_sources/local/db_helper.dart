@@ -176,11 +176,21 @@ class DBHelper {
     return db.rawQuery('''
       SELECT w.id, w.text, w.audio, w.translation, w.code_v3, w.meaning,
              w.meaning_src, w.ayaID,
-             v.ayaNumber, v.page
+             v.ayaNumber, v.page, v.hizbQuarter, v.sajda
       FROM words w JOIN verses v ON v.id = w.ayaID
       WHERE w.sura = ? AND w.char_type = 'word'
       ORDER BY w.id
     ''', [sura]);
+  }
+
+  /// Ayahs of [sura] that open a new quarter of a hizb (marked ۞).
+  static Future<Set<int>> quarterStarts(int sura) async {
+    final db = await database;
+    final rows = await db.rawQuery('''
+      SELECT v.id FROM verses v LEFT JOIN verses p ON p.id = v.id - 1
+      WHERE v.sura = ? AND (p.id IS NULL OR p.hizbQuarter != v.hizbQuarter)
+    ''', [sura]);
+    return {for (final r in rows) r['id'] as int};
   }
 
   static Future<Verse?> getVerseById(int id) async {

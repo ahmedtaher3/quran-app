@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:untitled/features/Koran/presentation/manager/cubit/verse_state.dart';
@@ -11,6 +12,11 @@ import '../../../data/repo/quran_repository.dart';
 
 class VerseCubit extends Cubit<VerseState> {
   final QuranRepository repo;
+
+  /// Bumped whenever the global reading position is saved, so the home
+  /// "continue reading" card stays current even when the reader moved on
+  /// to another sura instead of returning home.
+  static final positionSaved = ValueNotifier<int>(0);
 
   int? lastViewedAyahId;
   int? currentSuraNumber; // <<< الجديد
@@ -120,6 +126,7 @@ class VerseCubit extends Cubit<VerseState> {
     // 🔥 حفظ الموقع الأخير بشكل عام للوصول إليه من أي مكان
     await prefs.setInt("global_last_sura", suraNumber);
     await prefs.setInt("global_last_ayah_id", ayahId);
+    positionSaved.value++;
   }
 
   void startSequentialPlay() {

@@ -316,7 +316,9 @@ class _LastReadWidget extends StatelessWidget {
                               ),
                               if (lastAya != null)
                                 Text(
-                                  "الآية $lastAya",
+                                  state.lastReadPage == null
+                                      ? "الآية $lastAya"
+                                      : "الآية $lastAya • صفحة ${state.lastReadPage}",
                                   style: const TextStyle(
                                       color: Colors.white70, fontSize: 14),
                                 ),
