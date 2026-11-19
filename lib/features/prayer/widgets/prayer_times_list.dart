@@ -1,6 +1,7 @@
 import 'package:adhan/adhan.dart';
 import 'package:flutter/material.dart';
 import 'package:untitled/core/app_theme.dart';
+import 'package:untitled/features/prayer/adhan_prefs.dart';
 import 'package:untitled/features/prayer/prayer_service.dart';
 import 'package:untitled/features/prayer/widgets/time_format.dart';
 
@@ -19,7 +20,17 @@ const _icons = {
 class PrayerTimesList extends StatelessWidget {
   final PrayerSettings settings;
   final DateTime now;
-  const PrayerTimesList({super.key, required this.settings, required this.now});
+
+  /// Per-prayer alert state for the bell; no bells when [onAlertTap] is null.
+  final Map<Prayer, PrayerAlert> alerts;
+  final void Function(Prayer)? onAlertTap;
+  const PrayerTimesList({
+    super.key,
+    required this.settings,
+    required this.now,
+    this.alerts = const {},
+    this.onAlertTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -48,6 +59,12 @@ class PrayerTimesList extends StatelessWidget {
               isNext: p == next,
               tomorrow: tomorrow,
               past: p != next && !t.timeForPrayer(p)!.isAfter(now),
+              alert: settings.notify
+                  ? (alerts[p] ?? const PrayerAlert()).mode
+                  : AlertMode.off,
+              onAlertTap: p == Prayer.sunrise || onAlertTap == null
+                  ? null
+                  : () => onAlertTap!(p),
             ),
         ],
       ),
@@ -59,12 +76,16 @@ class _Row extends StatelessWidget {
   final Prayer prayer;
   final DateTime time;
   final bool isNext, past, tomorrow;
+  final AlertMode alert;
+  final VoidCallback? onAlertTap;
   const _Row({
     required this.prayer,
     required this.time,
     required this.isNext,
     required this.past,
     required this.tomorrow,
+    required this.alert,
+    this.onAlertTap,
   });
 
   @override
@@ -133,6 +154,23 @@ class _Row extends StatelessWidget {
                     fontWeight: isNext ? FontWeight.bold : FontWeight.w500,
                     color: AppColors.text,
                     fontFeatures: const [FontFeature.tabularFigures()])),
+            if (onAlertTap != null)
+              IconButton(
+                tooltip: 'تنبيه ${prayerNames[prayer]}: ${alert.label}',
+                visualDensity: VisualDensity.compact,
+                onPressed: onAlertTap,
+                icon: Icon(
+                  switch (alert) {
+                    AlertMode.adhan => Icons.notifications_active_rounded,
+                    AlertMode.notify => Icons.notifications_none_rounded,
+                    AlertMode.off => Icons.notifications_off_outlined,
+                  },
+                  size: 20,
+                  color: alert == AlertMode.off ? AppColors.subtle : primary,
+                ),
+              )
+            else if (prayer == Prayer.sunrise)
+              const SizedBox(width: 40), // keeps times aligned with the bells
           ],
         ),
       ),

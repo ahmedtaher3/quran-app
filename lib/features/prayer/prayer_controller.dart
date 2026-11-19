@@ -2,6 +2,7 @@ import 'package:adhan/adhan.dart';
 import 'package:flutter/widgets.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:untitled/core/notifications.dart';
+import 'package:untitled/features/prayer/adhan_prefs.dart';
 import 'package:untitled/features/prayer/adhan_scheduler.dart';
 import 'package:untitled/features/prayer/cities.dart';
 import 'package:untitled/features/prayer/hijri_date.dart';
@@ -26,14 +27,26 @@ class PrayerController extends ChangeNotifier with WidgetsBindingObserver {
   bool exactOk = true;
   String? error;
   double declination = 0;
+  Map<Prayer, PrayerAlert> alerts = const {};
   PrayerClock? clock;
   bool _disposed = false;
+
+  PrayerAlert alertFor(Prayer p) => alerts[p] ?? const PrayerAlert();
+
+  Future<void> setAlert(Prayer p, PrayerAlert a) async {
+    alerts = {...alerts, p: a};
+    _notify();
+    await AdhanPrefs.save(p, a);
+    final s = settings;
+    if (s != null) await AdhanScheduler.scheduleFor(s);
+  }
 
   Future<void> init() async {
     WidgetsBinding.instance.addObserver(this);
     final s = await PrayerStore.load();
     place = await PlaceStore.load();
     hijriAdjust = await HijriDate.loadAdjust();
+    alerts = await AdhanPrefs.load();
     loaded = true;
     if (s != null) {
       _apply(s);

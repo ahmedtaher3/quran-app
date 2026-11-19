@@ -4,6 +4,15 @@ import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:timezone/data/latest_all.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
 
+/// Which prayer channel a notification goes to.
+enum PrayerChannel { adhan, notify, reminder }
+
+/// "Stop adhan" is handled natively (the plugin cancels the notification,
+/// which stops its sound); the plugin still wants a Dart entry point for
+/// actions that arrive while the app is closed.
+@pragma('vm:entry-point')
+void notificationBackgroundResponse(NotificationResponse response) {}
+
 /// Thin wrapper: daily reminders by fixed id.
 class Notifications {
   static final _plugin = FlutterLocalNotificationsPlugin();
@@ -39,7 +48,11 @@ class Notifications {
           requestSoundPermission: false,
         ),
       ),
-      onDidReceiveNotificationResponse: (r) => onTap?.call(r.payload),
+      onDidReceiveNotificationResponse: (r) {
+        if (r.actionId == stopAdhanAction) return; // just silence it
+        onTap?.call(r.payload);
+      },
+      onDidReceiveBackgroundNotificationResponse: notificationBackgroundResponse,
     );
     _ready = true;
   }
@@ -73,31 +86,67 @@ class Notifications {
       ? AndroidScheduleMode.exactAllowWhileIdle
       : AndroidScheduleMode.inexactAllowWhileIdle;
 
-  /// One adhan at [at] on the adhan channel; tapping opens the prayer
-  /// screen. Falls back to inexact if the exact permission was revoked
-  /// between the check and this call.
+  static const stopAdhanAction = 'stop_adhan';
+
+  static NotificationDetails _prayerDetails(PrayerChannel c) => switch (c) {
+        PrayerChannel.adhan => const NotificationDetails(
+            android: AndroidNotificationDetails(
+              adhanChannelId,
+              'الأذان',
+              channelDescription: 'تنبيه عند دخول وقت كل صلاة',
+              importance: Importance.max,
+              priority: Priority.high,
+              category: AndroidNotificationCategory.reminder,
+              visibility: NotificationVisibility.public,
+              // dismissing the notification stops its sound; this does it
+              // without opening the app
+              actions: [
+                AndroidNotificationAction(stopAdhanAction, 'إيقاف الأذان',
+                    cancelNotification: true),
+              ],
+            ),
+            iOS: DarwinNotificationDetails(),
+          ),
+        PrayerChannel.notify => const NotificationDetails(
+            android: AndroidNotificationDetails(
+              'prayer_notify_v1',
+              'وقت الصلاة (إشعار)',
+              channelDescription: 'إشعار بنغمة عادية للصلوات المضبوطة على «إشعار»',
+              importance: Importance.high,
+              priority: Priority.high,
+              category: AndroidNotificationCategory.reminder,
+              visibility: NotificationVisibility.public,
+            ),
+            iOS: DarwinNotificationDetails(),
+          ),
+        PrayerChannel.reminder => const NotificationDetails(
+            android: AndroidNotificationDetails(
+              'prayer_reminder_v1',
+              'تذكير قبل الصلاة',
+              channelDescription: 'تذكير قبل دخول وقت الصلاة بدقائق',
+              importance: Importance.defaultImportance,
+              category: AndroidNotificationCategory.reminder,
+              visibility: NotificationVisibility.public,
+            ),
+            iOS: DarwinNotificationDetails(),
+          ),
+      };
+
+  /// One prayer notification at [at]; tapping opens the prayer screen.
+  /// Falls back to inexact if the exact permission was revoked between the
+  /// check and this call.
   static Future<void> scheduleAdhan({
     required int id,
     required DateTime at,
     required String title,
     required String body,
     required bool exact,
+    PrayerChannel channel = PrayerChannel.adhan,
   }) async {
     await init();
     final when = tz.TZDateTime.from(at, tz.local);
     if (!when.isAfter(tz.TZDateTime.now(tz.local))) return;
-    const details = NotificationDetails(
-      android: AndroidNotificationDetails(
-        adhanChannelId,
-        'الأذان',
-        channelDescription: 'تنبيه عند دخول وقت كل صلاة',
-        importance: Importance.max,
-        priority: Priority.high,
-        category: AndroidNotificationCategory.reminder,
-        visibility: NotificationVisibility.public,
-      ),
-      iOS: DarwinNotificationDetails(),
-    );
+    final details = _prayerDetails(channel);
     Future<void> go(AndroidScheduleMode mode) => _plugin.zonedSchedule(
           id: id,
           scheduledDate: when,

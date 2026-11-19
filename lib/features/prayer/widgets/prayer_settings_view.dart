@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:untitled/core/app_theme.dart';
 import 'package:untitled/core/notifications.dart';
 import 'package:untitled/features/prayer/adhan_scheduler.dart';
+import 'package:untitled/features/prayer/adhan_prefs.dart';
 import 'package:untitled/features/prayer/hijri_date.dart';
 import 'package:untitled/features/prayer/prayer_controller.dart';
 import 'package:untitled/features/prayer/prayer_service.dart';
 import 'package:untitled/features/prayer/widgets/location_intro.dart';
+import 'package:untitled/features/prayer/widgets/prayer_alert_sheet.dart';
 
 /// Everything that used to sit under the prayer list, in its own screen.
 class PrayerSettingsView extends StatelessWidget {
@@ -70,6 +72,34 @@ class PrayerSettingsView extends StatelessWidget {
                           onTap: Notifications.requestExactAlarms,
                         ),
               ]),
+              if (s.notify) ...[
+                const _Title('تنبيه كل صلاة'),
+                _Group(children: [
+                  for (final p in fivePrayers)
+                    ListTile(
+                      leading: Icon(
+                          c.alertFor(p).mode == AlertMode.off
+                              ? Icons.notifications_off_outlined
+                              : Icons.notifications_active_rounded,
+                          color: c.alertFor(p).mode == AlertMode.off
+                              ? AppColors.subtle
+                              : primary),
+                      title: Text(prayerNames[p]!),
+                      subtitle: Text(c.alertFor(p).summary),
+                      trailing: const Icon(Icons.chevron_left_rounded),
+                      onTap: () => showPrayerAlertSheet(context, c, p),
+                    ),
+                ]),
+                const _Title('صوت الأذان'),
+                _Group(children: [
+                  ListTile(
+                    leading: Icon(Icons.music_note_rounded, color: primary),
+                    title: const Text('نغمة الإشعار الافتراضية'),
+                    subtitle: const Text(
+                        'أصوات المؤذنين تتضاف هنا بعد اعتماد التسجيلات المرخّصة'),
+                  ),
+                ]),
+              ],
               const _Title('الحساب'),
               _Group(children: [
                 ListTile(

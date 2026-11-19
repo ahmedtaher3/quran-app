@@ -6,6 +6,7 @@ import 'package:untitled/features/prayer/hijri_date.dart';
 import 'package:untitled/features/prayer/prayer_controller.dart';
 import 'package:untitled/features/prayer/prayer_service.dart';
 import 'package:untitled/features/prayer/widgets/location_intro.dart';
+import 'package:untitled/features/prayer/widgets/prayer_alert_sheet.dart';
 import 'package:untitled/features/prayer/widgets/prayer_hero_card.dart';
 import 'package:untitled/features/prayer/widgets/prayer_settings_view.dart';
 import 'package:untitled/features/prayer/widgets/prayer_times_list.dart';
@@ -162,7 +163,12 @@ class _PrayerViewState extends State<PrayerView> {
                         ),
                       PrayerHeroCard(settings: s, onAlertTap: _openSettings),
                       const SizedBox(height: 12),
-                      PrayerTimesList(settings: s, now: now),
+                      PrayerTimesList(
+                        settings: s,
+                        now: now,
+                        alerts: _c.alerts,
+                        onAlertTap: (p) => showPrayerAlertSheet(context, _c, p),
+                      ),
                       const SizedBox(height: 12),
                       _Footer(settings: s, onTap: _openSettings),
                     ],

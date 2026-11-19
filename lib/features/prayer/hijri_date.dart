@@ -7,6 +7,13 @@ class HijriDate {
   static const maxAdjust = 2;
   static const _key = 'prayer_hijri_adj';
 
+  /// The package's Arabic names say "جمادى الثاني"; these are the usual
+  /// forms (the sixth month is جمادى الآخرة).
+  static const months = [
+    'محرم', 'صفر', 'ربيع الأول', 'ربيع الآخر', 'جمادى الأولى', 'جمادى الآخرة',
+    'رجب', 'شعبان', 'رمضان', 'شوال', 'ذو القعدة', 'ذو الحجة',
+  ];
+
   static Future<int> loadAdjust() async =>
       (await SharedPreferences.getInstance()).getInt(_key) ?? 0;
 
@@ -14,11 +21,11 @@ class HijriDate {
       (await SharedPreferences.getInstance())
           .setInt(_key, days.clamp(-maxAdjust, maxAdjust));
 
-  /// e.g. "٨ جمادى الآخرة ١٤٤٨ هـ".
+  /// e.g. "9 جمادى الآخرة 1448 هـ". Western digits like the prayer times:
+  /// the app font draws Arabic-Indic digits very small.
   static String format(DateTime day, {int adjust = 0}) {
-    HijriCalendar.setLocal('ar');
     final h =
         HijriCalendar.fromDate(DateTime(day.year, day.month, day.day + adjust));
-    return '${h.toFormat('dd MMMM yyyy')} هـ';
+    return '${h.hDay} ${months[h.hMonth - 1]} ${h.hYear} هـ';
   }
 }

@@ -1,14 +1,22 @@
 import 'package:adhan/adhan.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:untitled/core/notifications.dart';
+import 'package:untitled/features/prayer/adhan_prefs.dart';
 import 'package:untitled/features/prayer/prayer_service.dart';
 
-/// One planned adhan notification.
+enum AlertKind { adhan, notify, reminder }
+
+/// One planned prayer notification.
 class PlannedAdhan {
   final int id;
   final Prayer prayer;
   final DateTime at;
-  const PlannedAdhan(this.id, this.prayer, this.at);
+  final AlertKind kind;
+
+  /// Minutes before the prayer, for reminders.
+  final int minutesBefore;
+  const PlannedAdhan(this.id, this.prayer, this.at,
+      {this.kind = AlertKind.adhan, this.minutesBefore = 0});
 }
 
 /// Keeps a rolling window of adhan alarms planned ahead, so the adhan keeps
@@ -32,16 +40,29 @@ class AdhanScheduler {
 
   static int idFor(int day, int slot) => baseId + day * slotsPerDay + slot;
 
-  /// The adhans still ahead of [now] over [days] days, in time order.
+  /// Notifications still ahead of [now] over [days] days, in time order.
+  /// Each prayer follows its [alerts] entry; missing = adhan, no reminder.
   static List<PlannedAdhan> plan(PrayerSettings s, DateTime now,
-      {int days = days}) {
+      {int days = days, Map<Prayer, PrayerAlert> alerts = const {}}) {
     final out = <PlannedAdhan>[];
     for (var d = 0; d < days; d++) {
       final t = s.timesFor(DateTime(now.year, now.month, now.day + d));
       for (var i = 0; i < fivePrayers.length; i++) {
         final p = fivePrayers[i];
         final at = t.timeForPrayer(p)!;
-        if (at.isAfter(now)) out.add(PlannedAdhan(idFor(d, i), p, at));
+        final a = alerts[p] ?? const PrayerAlert();
+        final pre = a.reminderMinutes;
+        if (pre > 0) {
+          final when = at.subtract(Duration(minutes: pre));
+          if (when.isAfter(now)) {
+            out.add(PlannedAdhan(idFor(d, 5 + i), p, when,
+                kind: AlertKind.reminder, minutesBefore: pre));
+          }
+        }
+        if (a.mode != AlertMode.off && at.isAfter(now)) {
+          out.add(PlannedAdhan(idFor(d, i), p, at,
+              kind: a.mode == AlertMode.adhan ? AlertKind.adhan : AlertKind.notify));
+        }
       }
     }
     return out;
@@ -58,13 +79,24 @@ class AdhanScheduler {
     await Notifications.cancelPendingInRange(baseId, lastId);
     final exact = s.notify && await Notifications.canScheduleExact();
     if (s.notify) {
-      for (final a in plan(s, DateTime.now())) {
+      final alerts = await AdhanPrefs.load();
+      for (final a in plan(s, DateTime.now(), alerts: alerts)) {
+        final name = prayerNames[a.prayer];
         await Notifications.scheduleAdhan(
           id: a.id,
           at: a.at,
-          title: "حان الآن موعد صلاة ${prayerNames[a.prayer]}",
-          body: "حيّ على الصلاة، حيّ على الفلاح",
+          title: a.kind == AlertKind.reminder
+              ? "بعد ${a.minutesBefore} دقيقة: صلاة $name"
+              : "حان الآن موعد صلاة $name",
+          body: a.kind == AlertKind.reminder
+              ? "تذكير قبل الصلاة"
+              : "حيّ على الصلاة، حيّ على الفلاح",
           exact: exact,
+          channel: switch (a.kind) {
+            AlertKind.adhan => PrayerChannel.adhan,
+            AlertKind.notify => PrayerChannel.notify,
+            AlertKind.reminder => PrayerChannel.reminder,
+          },
         );
       }
     }

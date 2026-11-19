@@ -11,3 +11,6 @@ String prayerTime(BuildContext context, DateTime t) {
   final h = t.hour % 12 == 0 ? 12 : t.hour % 12;
   return '\u2066$h:$mm\u2069 ${t.hour < 12 ? 'ص' : 'م'}';
 }
+
+/// Keeps numbers like "+5.1°" in order inside Arabic text.
+String ltr(String s) => '\u2066$s\u2069';
