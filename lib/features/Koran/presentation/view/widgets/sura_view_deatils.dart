@@ -175,10 +175,15 @@ class _VerseListViewState extends State<VerseListView> {
   StreamSubscription<PlayerFailure>? _failures;
   Set<int> _quarterStarts = {}; // ayahs that open a hizb quarter (۞)
 
+  // Readers alive. Next/previous sura builds the new reader before the old
+  // one is disposed, so only the last one to close may release the wakelock.
+  static int _alive = 0;
+
   @override
   void initState() {
     super.initState();
     // keep the screen on while reading or listening, in both modes
+    _alive++;
     WakelockPlus.enable();
     _failures = QuranPlayer.instance.failures.listen(_showFailure);
     DBHelper.quarterStarts(widget.suraNumber).then((s) {
@@ -213,7 +218,7 @@ class _VerseListViewState extends State<VerseListView> {
   @override
   void dispose() {
     _failures?.cancel();
-    WakelockPlus.disable();
+    if (--_alive == 0) WakelockPlus.disable();
     _cubit.close(); // playback itself carries on in the background
     _scrollController.dispose();
     super.dispose();

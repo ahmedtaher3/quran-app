@@ -18,6 +18,7 @@ import es.antonborri.home_widget.HomeWidgetLaunchIntent
 import es.antonborri.home_widget.HomeWidgetProvider
 import org.json.JSONObject
 import java.util.Calendar
+import java.util.Locale
 
 /**
  * Home-screen prayer widget in three sizes. Data is a week of absolute
@@ -171,9 +172,10 @@ class PrayerWidgetProvider : HomeWidgetProvider() {
         fun clock(context: Context, at: Long, suffix: Boolean = true): String {
             val c = Calendar.getInstance().apply { timeInMillis = at }
             val h = c.get(Calendar.HOUR_OF_DAY)
-            val mm = "%02d".format(c.get(Calendar.MINUTE))
+            // Locale.US: "%02d" follows the device locale (Arabic-Indic digits)
+            val mm = String.format(Locale.US, "%02d", c.get(Calendar.MINUTE))
             if (android.text.format.DateFormat.is24HourFormat(context)) {
-                return "⁦${"%02d".format(h)}:$mm⁩"
+                return "⁦${String.format(Locale.US, "%02d", h)}:$mm⁩"
             }
             val h12 = if (h % 12 == 0) 12 else h % 12
             val t = "⁦$h12:$mm⁩"
@@ -195,7 +197,19 @@ class PrayerWidgetProvider : HomeWidgetProvider() {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             )
             val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-            am.set(AlarmManager.RTC, at, pi) // RTC, not RTC_WAKEUP: never wakes the device
+            // RTC, not RTC_WAKEUP: never wakes the device. A plain set() may be
+            // deferred up to an hour, leaving the passed prayer on screen with
+            // the countdown running negative; ask for an exact time when the
+            // user allowed it, else a 10-minute window (the API 31+ minimum).
+            try {
+                if (Build.VERSION.SDK_INT < 31 || am.canScheduleExactAlarms()) {
+                    am.setExact(AlarmManager.RTC, at, pi)
+                    return
+                }
+            } catch (_: SecurityException) {
+                // permission revoked between the check and the call
+            }
+            am.setWindow(AlarmManager.RTC, at, 10 * 60_000L, pi)
         }
     }
 }

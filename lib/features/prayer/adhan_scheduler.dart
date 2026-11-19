@@ -76,7 +76,18 @@ class AdhanScheduler {
     await scheduleFor(s);
   }
 
-  static Future<void> scheduleFor(PrayerSettings s) async {
+  // App start, resume, the prayer screen and the background job can all
+  // replan at once; run them one after another so a newer plan (say, an
+  // alert just turned off) is never overwritten by an older one finishing late.
+  static Future<void> _queue = Future.value();
+
+  static Future<void> scheduleFor(PrayerSettings s) {
+    final run = _queue.then((_) => _scheduleFor(s));
+    _queue = run.catchError((_) {});
+    return run;
+  }
+
+  static Future<void> _scheduleFor(PrayerSettings s) async {
     await Notifications.cancelPendingInRange(baseId, lastId);
     final exact = s.notify && await Notifications.canScheduleExact();
     if (s.notify) {

@@ -6,6 +6,7 @@ import 'package:untitled/features/prayer/adhan_prefs.dart';
 import 'package:untitled/features/prayer/adhan_scheduler.dart';
 import 'package:untitled/features/prayer/cities.dart';
 import 'package:untitled/features/prayer/hijri_date.dart';
+import 'package:untitled/features/prayer/prayer_background.dart';
 import 'package:untitled/features/prayer/prayer_clock.dart';
 import 'package:untitled/features/prayer/prayer_service.dart';
 import 'package:untitled/features/prayer/qibla_sensor.dart';
@@ -62,6 +63,7 @@ class PrayerController extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   void _apply(PrayerSettings s) {
+    if (_disposed) return; // screen closed while loading or locating
     final newPlace =
         settings == null || settings!.lat != s.lat || settings!.lng != s.lng;
     settings = s;
@@ -122,6 +124,7 @@ class PrayerController extends ChangeNotifier with WidgetsBindingObserver {
     error = null;
     _apply(s);
     WidgetSync.update(); // place name changed after the replan
+    if (old == null) PrayerBackground.ensurePeriodic();
   }
 
   Future<void> update(PrayerSettings s) async {
