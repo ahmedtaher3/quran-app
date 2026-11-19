@@ -10,6 +10,8 @@ import 'package:untitled/core/notifications.dart';
 import 'package:untitled/features/prayer/adhan_scheduler.dart';
 import 'package:untitled/features/prayer/prayer_background.dart';
 import 'package:untitled/features/prayer/prayer_launch.dart';
+import 'package:untitled/features/prayer/widget_sync.dart';
+import 'package:home_widget/home_widget.dart';
 import 'loading_screen.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
@@ -30,6 +32,13 @@ void main() async {
   AdhanScheduler.reschedule(); // same for the adhan window
   PrayerBackground.init(); // and keeps it rolling while the app is closed
   Notifications.launchPayload().then(PrayerLaunch.handlePayload);
+  // home-screen widget: cold start, and taps while the app is running
+  HomeWidget.initiallyLaunchedFromHomeWidget().then(_openFromWidget);
+  HomeWidget.widgetClicked.listen(_openFromWidget);
+}
+
+void _openFromWidget(Uri? uri) {
+  if (WidgetSync.isPrayerUri(uri)) PrayerLaunch.open();
 }
 //  Navigator.push(
 //                 context,

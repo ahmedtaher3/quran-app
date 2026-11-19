@@ -7,6 +7,7 @@ import 'package:untitled/features/prayer/adhan_prefs.dart';
 import 'package:untitled/features/prayer/hijri_date.dart';
 import 'package:untitled/features/prayer/prayer_controller.dart';
 import 'package:untitled/features/prayer/prayer_service.dart';
+import 'package:untitled/features/prayer/widget_sync.dart';
 import 'package:untitled/features/prayer/widgets/location_intro.dart';
 import 'package:untitled/features/prayer/widgets/prayer_alert_sheet.dart';
 
@@ -167,6 +168,23 @@ class PrayerSettingsView extends StatelessWidget {
                   ),
                 ),
               ]),
+              FutureBuilder<bool>(
+                future: WidgetSync.canPin(),
+                builder: (context, snap) => snap.data != true
+                    ? const SizedBox.shrink()
+                    : Column(children: [
+                        const _Title('الشاشة الرئيسية'),
+                        _Group(children: [
+                          ListTile(
+                            leading: Icon(Icons.widgets_outlined, color: primary),
+                            title: const Text('أضف ويدجت المواقيت'),
+                            subtitle: const Text('الصلاة القادمة وعدّ تنازلي على الشاشة الرئيسية'),
+                            trailing: const Icon(Icons.add_rounded),
+                            onTap: WidgetSync.pin,
+                          ),
+                        ]),
+                      ]),
+              ),
               const _Title('الموقع'),
               _Group(children: [
                 ListTile(

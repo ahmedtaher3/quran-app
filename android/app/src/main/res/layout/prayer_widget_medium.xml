@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 4x1: next prayer, countdown and the five times. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:id="@+id/pw_root" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:gravity="center_vertical" android:padding="12dp" android:background="@drawable/pw_bg" android:layoutDirection="locale">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
+        <TextView android:id="@+id/pw_name" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="16sp" android:textStyle="bold" android:textColor="@color/pw_text" android:maxLines="2" />
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text=" · " android:textColor="@color/pw_sub" />
+        <TextView android:id="@+id/pw_time" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="12sp" android:textColor="@color/pw_sub" android:maxLines="1" />
+        <FrameLayout android:layout_width="0dp" android:layout_height="1dp" android:layout_weight="1" />
+        <Chronometer android:id="@+id/pw_countdown" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="18sp" android:textStyle="bold" android:textColor="@color/pw_primary" android:layoutDirection="ltr" android:textDirection="ltr" />
+    </LinearLayout>
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginTop="6dp">
+        <LinearLayout android:id="@+id/pw_cell0" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:gravity="center" android:paddingTop="3dp" android:paddingBottom="3dp" android:background="@drawable/pw_cell_off">
+            <TextView android:id="@+id/pw_cname0" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="11sp" android:textColor="@color/pw_sub" android:maxLines="1" />
+            <TextView android:id="@+id/pw_ctime0" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="12sp" android:textStyle="bold" android:textColor="@color/pw_text" android:maxLines="1" />
+        </LinearLayout>
+        <LinearLayout android:id="@+id/pw_cell1" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:gravity="center" android:paddingTop="3dp" android:paddingBottom="3dp" android:background="@drawable/pw_cell_off">
+            <TextView android:id="@+id/pw_cname1" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="11sp" android:textColor="@color/pw_sub" android:maxLines="1" />
+            <TextView android:id="@+id/pw_ctime1" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="12sp" android:textStyle="bold" android:textColor="@color/pw_text" android:maxLines="1" />
+        </LinearLayout>
+        <LinearLayout android:id="@+id/pw_cell2" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:gravity="center" android:paddingTop="3dp" android:paddingBottom="3dp" android:background="@drawable/pw_cell_off">
+            <TextView android:id="@+id/pw_cname2" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="11sp" android:textColor="@color/pw_sub" android:maxLines="1" />
+            <TextView android:id="@+id/pw_ctime2" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="12sp" android:textStyle="bold" android:textColor="@color/pw_text" android:maxLines="1" />
+        </LinearLayout>
+        <LinearLayout android:id="@+id/pw_cell3" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:gravity="center" android:paddingTop="3dp" android:paddingBottom="3dp" android:background="@drawable/pw_cell_off">
+            <TextView android:id="@+id/pw_cname3" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="11sp" android:textColor="@color/pw_sub" android:maxLines="1" />
+            <TextView android:id="@+id/pw_ctime3" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="12sp" android:textStyle="bold" android:textColor="@color/pw_text" android:maxLines="1" />
+        </LinearLayout>
+        <LinearLayout android:id="@+id/pw_cell4" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:gravity="center" android:paddingTop="3dp" android:paddingBottom="3dp" android:background="@drawable/pw_cell_off">
+            <TextView android:id="@+id/pw_cname4" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="11sp" android:textColor="@color/pw_sub" android:maxLines="1" />
+            <TextView android:id="@+id/pw_ctime4" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="12sp" android:textStyle="bold" android:textColor="@color/pw_text" android:maxLines="1" />
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="prayer_widget_label">مواقيت الصلاة</string>
+    <string name="prayer_widget_description">الصلاة القادمة وعدّ تنازلي ومواقيت اليوم</string>
+    <string name="prayer_widget_stale">افتح التطبيق لتحديث المواقيت</string>
+    <string name="prayer_widget_next">الصلاة القادمة</string>
+    <string name="prayer_widget_left">متبقٍ</string>
+    <color name="pw_bg">#F2FFFFFF</color>
+    <color name="pw_text">#16211F</color>
+    <color name="pw_sub">#5F6F6B</color>
+    <color name="pw_primary">#00695C</color>
+    <color name="pw_chip">#E0F2EF</color>
+    <color name="pw_track">#E3EAE8</color>
+</resources>

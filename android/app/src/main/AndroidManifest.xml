@@ -30,7 +30,8 @@
         android:requestLegacyExternalStorage="true"
         android:label="Tarik Al Quran"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:supportsRtl="true">
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -48,6 +49,13 @@
               android:name="io.flutter.embedding.android.NormalTheme"
               android:resource="@style/NormalTheme"
               />
+            <!-- The app has no deep links. Without this Flutter turns the
+                 widget's tarikquran://prayer launch URI into a route and
+                 pushes the home screen again; home_widget delivers it to
+                 PrayerLaunch instead. -->
+            <meta-data
+              android:name="flutter_deeplinking_enabled"
+              android:value="false" />
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
@@ -91,6 +99,19 @@
                 <action android:name="android.intent.action.TIMEZONE_CHANGED"/>
                 <action android:name="android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED"/>
             </intent-filter>
+        </receiver>
+        <!-- Home-screen prayer widget (PrayerWidgetProvider.kt). -->
+        <receiver android:name=".PrayerWidgetProvider"
+            android:exported="false"
+            android:label="@string/prayer_widget_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider"
+                android:resource="@xml/prayer_widget_info" />
         </receiver>
     </application>
     <!-- Required to query activities that can process text, see:

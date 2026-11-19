@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:untitled/core/notifications.dart';
 import 'package:untitled/features/prayer/adhan_prefs.dart';
 import 'package:untitled/features/prayer/prayer_service.dart';
+import 'package:untitled/features/prayer/widget_sync.dart';
 
 enum AlertKind { adhan, notify, reminder }
 
@@ -103,6 +104,7 @@ class AdhanScheduler {
     final p = await SharedPreferences.getInstance();
     await p.setInt(_lastRunKey, DateTime.now().millisecondsSinceEpoch);
     await p.setBool(_exactKey, exact);
+    await WidgetSync.update(); // the widget's week rolls with the window
   }
 
   static const testId = 299;

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="pw_bg">#F21A2725</color>
+    <color name="pw_text">#E8EFEE</color>
+    <color name="pw_sub">#9DB0AD</color>
+    <color name="pw_primary">#4DB6AC</color>
+    <color name="pw_chip">#173B37</color>
+    <color name="pw_track">#2A3B38</color>
+</resources>

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- No updatePeriodMillis: the countdown is a Chronometer and the provider
+     sets a non-waking alarm for the next prayer, so nothing polls. -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="110dp"
+    android:minHeight="40dp"
+    android:minResizeWidth="110dp"
+    android:minResizeHeight="40dp"
+    android:targetCellWidth="2"
+    android:targetCellHeight="1"
+    android:resizeMode="horizontal|vertical"
+    android:updatePeriodMillis="0"
+    android:initialLayout="@layout/prayer_widget_small"
+    android:previewLayout="@layout/prayer_widget_large"
+    android:description="@string/prayer_widget_description"
+    android:widgetCategory="home_screen" />

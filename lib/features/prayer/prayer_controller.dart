@@ -9,6 +9,7 @@ import 'package:untitled/features/prayer/hijri_date.dart';
 import 'package:untitled/features/prayer/prayer_clock.dart';
 import 'package:untitled/features/prayer/prayer_service.dart';
 import 'package:untitled/features/prayer/qibla_sensor.dart';
+import 'package:untitled/features/prayer/widget_sync.dart';
 
 /// More than [km] from the saved place: worth offering a location update
 /// (travel), without ever changing it silently.
@@ -120,6 +121,7 @@ class PrayerController extends ChangeNotifier with WidgetsBindingObserver {
     moved = false;
     error = null;
     _apply(s);
+    WidgetSync.update(); // place name changed after the replan
   }
 
   Future<void> update(PrayerSettings s) async {
@@ -135,6 +137,7 @@ class PrayerController extends ChangeNotifier with WidgetsBindingObserver {
     hijriAdjust = days.clamp(-HijriDate.maxAdjust, HijriDate.maxAdjust);
     _notify();
     await HijriDate.saveAdjust(hijriAdjust);
+    await WidgetSync.update();
   }
 
   void dismissMoved() {
