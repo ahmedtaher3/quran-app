@@ -18,9 +18,8 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="29" />
-
-    <!-- REQUIRED Only for Android 11+ -->
-    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" tools:ignore="ScopedStorage" />
+    <!-- No MANAGE_EXTERNAL_STORAGE: downloads and shares live in app-private
+         folders (path_provider), and Play rejects all-files access for this app. -->
     <queries>
         <intent>
             <action android:name="android.speech.RecognitionService" />
