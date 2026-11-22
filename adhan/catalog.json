@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "items": [
+    {
+      "id": "cairo_khan_el_khalili",
+      "name": "أذان من خان الخليلي",
+      "place": "القاهرة",
+      "url": "https://raw.githubusercontent.com/ahmedtaher3/quran-app/main/adhan/audio/cairo_khan_el_khalili.mp3",
+      "size": 2712809,
+      "seconds": 226,
+      "credit": "3bagbrew · CC0"
+    },
+    {
+      "id": "azeez",
+      "name": "أذان بصوت عاقب عزيز",
+      "place": "",
+      "url": "https://raw.githubusercontent.com/ahmedtaher3/quran-app/main/adhan/audio/azeez.mp3",
+      "size": 1037628,
+      "seconds": 86,
+      "credit": "Atcovi · CC BY-SA 4.0"
+    }
+  ]
+}

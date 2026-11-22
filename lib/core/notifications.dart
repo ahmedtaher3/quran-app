@@ -24,6 +24,22 @@ class Notifications {
   /// Adhan gets its own channel so muting "آية اليوم" never mutes it.
   /// Channel sound can't change after creation; a new sound = a new id.
   static const adhanChannelId = 'prayer_adhan_system_v1';
+  static const _adhanPrefix = 'prayer_adhan_';
+
+  /// The channel an adhan sound plays on: the default tone keeps the
+  /// original channel, each picked sound gets one of its own (a stable id
+  /// from its uri, so the scheduler and the background job agree).
+  static String adhanChannelFor(String? soundUri) =>
+      soundUri == null ? adhanChannelId : '$_adhanPrefix${_fnv1a(soundUri)}';
+
+  static String _fnv1a(String s) {
+    var h = 0x811c9dc5;
+    for (final c in s.codeUnits) {
+      h ^= c;
+      h = (h * 0x01000193) & 0xffffffff;
+    }
+    return h.toRadixString(16).padLeft(8, '0');
+  }
   static const prayerPayload = 'prayer';
 
   /// Called with the payload when the user taps one of our notifications
@@ -88,24 +104,30 @@ class Notifications {
 
   static const stopAdhanAction = 'stop_adhan';
 
-  static NotificationDetails _prayerDetails(PrayerChannel c) => switch (c) {
-        PrayerChannel.adhan => const NotificationDetails(
-            android: AndroidNotificationDetails(
-              adhanChannelId,
-              'الأذان',
-              channelDescription: 'تنبيه عند دخول وقت كل صلاة',
-              importance: Importance.max,
-              priority: Priority.high,
-              category: AndroidNotificationCategory.reminder,
-              visibility: NotificationVisibility.public,
-              // dismissing the notification stops its sound; this does it
-              // without opening the app
-              actions: [
-                AndroidNotificationAction(stopAdhanAction, 'إيقاف الأذان',
-                    cancelNotification: true),
-              ],
-            ),
-            iOS: DarwinNotificationDetails(),
+  static AndroidNotificationDetails _adhanAndroid(String? soundUri, String name) =>
+      AndroidNotificationDetails(
+        adhanChannelFor(soundUri),
+        name,
+        channelDescription: 'تنبيه عند دخول وقت كل صلاة',
+        importance: Importance.max,
+        priority: Priority.high,
+        category: AndroidNotificationCategory.reminder,
+        visibility: NotificationVisibility.public,
+        sound: soundUri == null ? null : UriAndroidNotificationSound(soundUri),
+        // dismissing the notification stops its sound; this does it
+        // without opening the app
+        actions: const [
+          AndroidNotificationAction(stopAdhanAction, 'إيقاف الأذان',
+              cancelNotification: true),
+        ],
+      );
+
+  static NotificationDetails _prayerDetails(PrayerChannel c,
+          {String? soundUri, String adhanName = 'الأذان'}) =>
+      switch (c) {
+        PrayerChannel.adhan => NotificationDetails(
+            android: _adhanAndroid(soundUri, adhanName),
+            iOS: const DarwinNotificationDetails(),
           ),
         PrayerChannel.notify => const NotificationDetails(
             android: AndroidNotificationDetails(
@@ -134,7 +156,8 @@ class Notifications {
 
   /// One prayer notification at [at]; tapping opens the prayer screen.
   /// Falls back to inexact if the exact permission was revoked between the
-  /// check and this call.
+  /// check and this call. [soundUri] (adhan channel only): the picked
+  /// sound, null for the default tone.
   static Future<void> scheduleAdhan({
     required int id,
     required DateTime at,
@@ -142,11 +165,13 @@ class Notifications {
     required String body,
     required bool exact,
     PrayerChannel channel = PrayerChannel.adhan,
+    String? soundUri,
+    String adhanName = 'الأذان',
   }) async {
     await init();
     final when = tz.TZDateTime.from(at, tz.local);
     if (!when.isAfter(tz.TZDateTime.now(tz.local))) return;
-    final details = _prayerDetails(channel);
+    final details = _prayerDetails(channel, soundUri: soundUri, adhanName: adhanName);
     Future<void> go(AndroidScheduleMode mode) => _plugin.zonedSchedule(
           id: id,
           scheduledDate: when,
@@ -161,6 +186,33 @@ class Notifications {
     } on PlatformException {
       if (!exact) rethrow;
       await go(scheduleModeFor(exact: false));
+    }
+  }
+
+  /// Creates the channel for [soundUri] now, so it exists before older
+  /// ones are dropped and before the first adhan fires.
+  static Future<void> ensureAdhanChannel(String? soundUri, {String name = 'الأذان'}) async {
+    await init();
+    final d = _adhanAndroid(soundUri, name);
+    await _android?.createNotificationChannel(AndroidNotificationChannel(
+      d.channelId,
+      d.channelName,
+      description: d.channelDescription,
+      importance: d.importance,
+      sound: d.sound,
+    ));
+  }
+
+  /// Deletes adhan channels left behind by earlier sound choices. The
+  /// default-tone channel always stays.
+  static Future<void> dropAdhanChannelsExcept(Set<String> keep) async {
+    await init();
+    final android = _android;
+    if (android == null) return;
+    for (final ch in await android.getNotificationChannels() ?? const <AndroidNotificationChannel>[]) {
+      if (ch.id.startsWith(_adhanPrefix) && ch.id != adhanChannelId && !keep.contains(ch.id)) {
+        await android.deleteNotificationChannel(channelId: ch.id);
+      }
     }
   }
 

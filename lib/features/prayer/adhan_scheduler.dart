@@ -2,6 +2,7 @@ import 'package:adhan/adhan.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:untitled/core/notifications.dart';
 import 'package:untitled/features/prayer/adhan_prefs.dart';
+import 'package:untitled/features/prayer/adhan_sound/adhan_sound_prefs.dart';
 import 'package:untitled/features/prayer/prayer_service.dart';
 import 'package:untitled/features/prayer/widget_sync.dart';
 
@@ -92,9 +93,15 @@ class AdhanScheduler {
     final exact = s.notify && await Notifications.canScheduleExact();
     if (s.notify) {
       final alerts = await AdhanPrefs.load();
+      final sounds = await AdhanSounds.load();
+      final allUri = sounds.uriFor(fajr: false);
+      final fajrUri = sounds.uriFor(fajr: true);
       for (final a in plan(s, DateTime.now(), alerts: alerts)) {
         final name = prayerNames[a.prayer];
+        final fajr = a.prayer == Prayer.fajr;
         await Notifications.scheduleAdhan(
+          soundUri: fajr ? fajrUri : allUri,
+          adhanName: fajr && fajrUri != allUri ? 'أذان الفجر' : 'الأذان',
           id: a.id,
           at: a.at,
           title: a.kind == AlertKind.reminder
@@ -124,7 +131,9 @@ class AdhanScheduler {
   /// seconds from now, so the user can check sound and permissions.
   static Future<void> scheduleTest(
       {Duration after = const Duration(seconds: 5)}) async {
+    final sounds = await AdhanSounds.load();
     await Notifications.scheduleAdhan(
+      soundUri: sounds.uriFor(fajr: false),
       id: testId,
       at: DateTime.now().add(after),
       title: "أذان تجريبي",

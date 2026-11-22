@@ -10,6 +10,9 @@ import 'package:untitled/features/prayer/prayer_service.dart';
 import 'package:untitled/features/prayer/widget_sync.dart';
 import 'package:untitled/features/prayer/widgets/location_intro.dart';
 import 'package:untitled/features/prayer/widgets/prayer_alert_sheet.dart';
+import 'package:untitled/features/prayer/widgets/adhan_sound_view.dart';
+import 'package:untitled/features/prayer/widgets/settings_group.dart';
+import 'package:untitled/features/prayer/adhan_sound/adhan_sound_store.dart';
 
 /// Everything that used to sit under the prayer list, in its own screen.
 class PrayerSettingsView extends StatelessWidget {
@@ -36,8 +39,8 @@ class PrayerSettingsView extends StatelessWidget {
             padding: EdgeInsets.fromLTRB(
                 16, 0, 16, 24 + MediaQuery.paddingOf(context).bottom),
             children: [
-              const _Title('التنبيهات'),
-              _Group(children: [
+              const SettingsTitle('التنبيهات'),
+              SettingsGroup(children: [
                 SwitchListTile(
                   value: s.notify,
                   onChanged: (v) => c.update(
@@ -74,8 +77,8 @@ class PrayerSettingsView extends StatelessWidget {
                         ),
               ]),
               if (s.notify) ...[
-                const _Title('تنبيه كل صلاة'),
-                _Group(children: [
+                const SettingsTitle('تنبيه كل صلاة'),
+                SettingsGroup(children: [
                   for (final p in fivePrayers)
                     ListTile(
                       leading: Icon(
@@ -91,18 +94,11 @@ class PrayerSettingsView extends StatelessWidget {
                       onTap: () => showPrayerAlertSheet(context, c, p),
                     ),
                 ]),
-                const _Title('صوت الأذان'),
-                _Group(children: [
-                  ListTile(
-                    leading: Icon(Icons.music_note_rounded, color: primary),
-                    title: const Text('نغمة الإشعار الافتراضية'),
-                    subtitle: const Text(
-                        'أصوات المؤذنين تتضاف هنا بعد اعتماد التسجيلات المرخّصة'),
-                  ),
-                ]),
+                const SettingsTitle('صوت الأذان'),
+                const _AdhanSoundRows(),
               ],
-              const _Title('الحساب'),
-              _Group(children: [
+              const SettingsTitle('الحساب'),
+              SettingsGroup(children: [
                 ListTile(
                   leading: Icon(Icons.calculate_rounded, color: primary),
                   title: const Text('طريقة الحساب'),
@@ -139,8 +135,8 @@ class PrayerSettingsView extends StatelessWidget {
                   ),
                 ),
               ]),
-              const _Title('التاريخ الهجري'),
-              _Group(children: [
+              const SettingsTitle('التاريخ الهجري'),
+              SettingsGroup(children: [
                 ListTile(
                   leading: Icon(Icons.calendar_month_rounded, color: primary),
                   title: Text(HijriDate.format(DateTime.now(), adjust: c.hijriAdjust)),
@@ -173,8 +169,8 @@ class PrayerSettingsView extends StatelessWidget {
                 builder: (context, snap) => snap.data != true
                     ? const SizedBox.shrink()
                     : Column(children: [
-                        const _Title('الشاشة الرئيسية'),
-                        _Group(children: [
+                        const SettingsTitle('الشاشة الرئيسية'),
+                        SettingsGroup(children: [
                           ListTile(
                             leading: Icon(Icons.widgets_outlined, color: primary),
                             title: const Text('أضف ويدجت المواقيت'),
@@ -185,8 +181,8 @@ class PrayerSettingsView extends StatelessWidget {
                         ]),
                       ]),
               ),
-              const _Title('الموقع'),
-              _Group(children: [
+              const SettingsTitle('الموقع'),
+              SettingsGroup(children: [
                 ListTile(
                   leading: Icon(Icons.location_on_rounded, color: primary),
                   title: Text(c.place ?? 'موقعك الحالي'),
@@ -248,28 +244,50 @@ class PrayerSettingsView extends StatelessWidget {
   }
 }
 
-class _Title extends StatelessWidget {
-  final String text;
-  const _Title(this.text);
+/// "صوت الأذان" and "أذان الفجر", each showing the current choice and
+/// opening the picker on its tab.
+class _AdhanSoundRows extends StatefulWidget {
+  const _AdhanSoundRows();
 
   @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsetsDirectional.fromSTEB(8, 18, 8, 8),
-        child: Text(text,
-            style: TextStyle(
-                fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.heading)),
-      );
+  State<_AdhanSoundRows> createState() => _AdhanSoundRowsState();
 }
 
-class _Group extends StatelessWidget {
-  final List<Widget> children;
-  const _Group({required this.children});
+class _AdhanSoundRowsState extends State<_AdhanSoundRows> {
+  final store = AdhanSoundStore.instance;
 
   @override
-  Widget build(BuildContext context) => Material(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(20),
-        clipBehavior: Clip.antiAlias,
-        child: Column(children: children),
-      );
+  void initState() {
+    super.initState();
+    store.load();
+  }
+
+  void _open(bool fajr) => Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => AdhanSoundView(startFajr: fajr)));
+
+  @override
+  Widget build(BuildContext context) {
+    final primary = Theme.of(context).colorScheme.primary;
+    return ListenableBuilder(
+      listenable: store,
+      builder: (context, _) => SettingsGroup(children: [
+        ListTile(
+          leading: Icon(Icons.music_note_rounded, color: primary),
+          title: const Text('صوت الأذان'),
+          subtitle: Text(store.sounds.labelFor(fajr: false),
+              maxLines: 1, overflow: TextOverflow.ellipsis),
+          trailing: const Icon(Icons.chevron_left_rounded),
+          onTap: () => _open(false),
+        ),
+        ListTile(
+          leading: Icon(Icons.nightlight_round, color: primary),
+          title: const Text('أذان الفجر'),
+          subtitle: Text(store.sounds.labelFor(fajr: true),
+              maxLines: 1, overflow: TextOverflow.ellipsis),
+          trailing: const Icon(Icons.chevron_left_rounded),
+          onTap: () => _open(true),
+        ),
+      ]),
+    );
+  }
 }
