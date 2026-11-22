@@ -76,5 +76,7 @@
 	<string>للاستماع إلى تلاوتك في وضع التسميع</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>لحساب مواقيت الصلاة واتجاه القبلة حسب موقعك</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 </dict>
 </plist>

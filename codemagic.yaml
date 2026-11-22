@@ -1,0 +1,49 @@
+workflows:
+  ios-testflight:
+    name: iOS → TestFlight
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    environment:
+      flutter: 3.44.9 # keep in sync with .fvmrc
+      xcode: latest
+      cocoapods: default
+      groups:
+        # Secure vars set in Codemagic UI (never in this public repo):
+        # APP_STORE_CONNECT_ISSUER_ID, APP_STORE_CONNECT_KEY_IDENTIFIER,
+        # APP_STORE_CONNECT_PRIVATE_KEY (.p8 contents), CERTIFICATE_PRIVATE_KEY
+        - app_store_credentials
+      vars:
+        BUNDLE_ID: com.tarik.al.quran
+        APP_STORE_APPLE_ID: 6826605781
+    scripts:
+      - name: Initialize keychain
+        script: keychain initialize
+      - name: Fetch signing files (creates cert + App Store profile on first run)
+        script: |
+          app-store-connect fetch-signing-files "$BUNDLE_ID" \
+            --type IOS_APP_STORE \
+            --create
+      - name: Add certificates to keychain
+        script: keychain add-certificates
+      - name: Apply profiles to Xcode project
+        script: xcode-project use-profiles
+      - name: Get packages
+        script: flutter pub get
+      - name: Build IPA
+        script: |
+          LATEST=$(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID" || echo 0)
+          BUILD_NUMBER=$((LATEST + 1))
+          echo "Version from pubspec, build number $BUILD_NUMBER"
+          flutter build ipa --release \
+            --build-number="$BUILD_NUMBER" \
+            --export-options-plist=/Users/builder/export_options.plist
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.dSYM
+    publishing:
+      app_store_connect:
+        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
+        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
+        issuer_id: $APP_STORE_CONNECT_ISSUER_ID
+        submit_to_testflight: false
