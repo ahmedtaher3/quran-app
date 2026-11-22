@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:adhan/adhan.dart';
 import 'package:flutter/material.dart';
 import 'package:untitled/core/app_theme.dart';
@@ -94,8 +96,12 @@ class PrayerSettingsView extends StatelessWidget {
                       onTap: () => showPrayerAlertSheet(context, c, p),
                     ),
                 ]),
-                const SettingsTitle('صوت الأذان'),
-                const _AdhanSoundRows(),
+                // The sound picker is Android-only (AdhanSoundChannel.kt);
+                // iOS has no native side for it yet.
+                if (Platform.isAndroid) ...[
+                  const SettingsTitle('صوت الأذان'),
+                  const _AdhanSoundRows(),
+                ],
               ],
               const SettingsTitle('الحساب'),
               SettingsGroup(children: [
