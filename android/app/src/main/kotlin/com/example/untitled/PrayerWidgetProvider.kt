@@ -104,10 +104,12 @@ class PrayerWidgetProvider : HomeWidgetProvider() {
             v.setTextViewText(R.id.pw_name, context.getString(R.string.prayer_widget_stale))
             v.setViewVisibility(R.id.pw_time, View.GONE)
             v.setViewVisibility(R.id.pw_countdown, View.GONE)
+            v.setViewVisibility(R.id.pw_left, View.GONE)
             return v
         }
         v.setViewVisibility(R.id.pw_time, View.VISIBLE)
         v.setViewVisibility(R.id.pw_countdown, View.VISIBLE)
+        v.setViewVisibility(R.id.pw_left, View.VISIBLE)
         val tomorrow = !sameDay(next.at, now)
         v.setTextViewText(R.id.pw_name, data.names[next.index])
         v.setTextViewText(

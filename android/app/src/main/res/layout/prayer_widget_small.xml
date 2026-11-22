@@ -6,5 +6,9 @@
         <FrameLayout android:layout_width="0dp" android:layout_height="1dp" android:layout_weight="1" />
         <TextView android:id="@+id/pw_time" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="12sp" android:textColor="@color/pw_sub" android:maxLines="1" />
     </LinearLayout>
-    <Chronometer android:id="@+id/pw_countdown" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="20sp" android:textStyle="bold" android:textColor="@color/pw_primary" android:layoutDirection="ltr" android:textDirection="ltr" />
+    <!-- RTL row: the label sits right of the number, read "متبقٍ 11:33" -->
+    <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
+        <TextView android:id="@+id/pw_left" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginEnd="4dp" android:text="@string/prayer_widget_left" android:textSize="11sp" android:textColor="@color/pw_sub" />
+        <Chronometer android:id="@+id/pw_countdown" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="20sp" android:textStyle="bold" android:textColor="@color/pw_primary" android:layoutDirection="ltr" android:textDirection="ltr" />
+    </LinearLayout>
 </LinearLayout>
